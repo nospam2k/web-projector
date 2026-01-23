@@ -45,19 +45,13 @@ function useDatabase() {
   const [songItems, setSongItems] = useState([]);
   const [slideItems, setSlideItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isElectron = typeof window.electronAPI !== 'undefined';
 
   const loadSongs = async () => {
     try {
       setLoading(true);
-      if (isElectron) {
-        const result = await window.electronAPI.getAllSongs();
-        setSongs(result || []);
-      } else {
-        const response = await fetch('/api/songs');
-        const result = await response.json();
-        setSongs(result || []);
-      }
+      const response = await fetch('/api/songs');
+      const result = await response.json();
+      setSongs(result || []);
     } catch (err) {
       console.error('Error loading songs:', err);
       setSongs([]);
@@ -69,14 +63,9 @@ function useDatabase() {
   const loadSlides = async () => {
     try {
       setLoading(true);
-      if (isElectron) {
-        const result = await window.electronAPI.getAllSlides();
-        setSlides(result || []);
-      } else {
-        const response = await fetch('/api/slides');
-        const result = await response.json();
-        setSlides(result || []);
-      }
+      const response = await fetch('/api/slides');
+      const result = await response.json();
+      setSlides(result || []);
     } catch (err) {
       console.error('Error loading slides:', err);
       setSlides([]);
@@ -87,19 +76,12 @@ function useDatabase() {
 
   const loadPlaylists = async () => {
     try {
-      if (isElectron) {
-        const songs = await window.electronAPI.getPlaylist('songs');
-        const slides = await window.electronAPI.getPlaylist('slides');
-        setSongItems(songs || []);
-        setSlideItems(slides || []);
-      } else {
-        const songsResponse = await fetch('/api/playlist/songs');
-        const slidesResponse = await fetch('/api/playlist/slides');
-        const songs = await songsResponse.json();
-        const slides = await slidesResponse.json();
-        setSongItems(songs || []);
-        setSlideItems(slides || []);
-      }
+      const songsResponse = await fetch('/api/playlist/songs');
+      const slidesResponse = await fetch('/api/playlist/slides');
+      const songs = await songsResponse.json();
+      const slides = await slidesResponse.json();
+      setSongItems(songs || []);
+      setSlideItems(slides || []);
     } catch (err) {
       console.error('Error loading playlists:', err);
     }
@@ -111,17 +93,13 @@ function useDatabase() {
     loadPlaylists();
   }, []);
 
-  return { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading, isElectron };
+  return { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading };
 }
 
 function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems) {
   const [ws, setWs] = useState(null);
-  const [isElectron] = useState(typeof window.electronAPI !== 'undefined');
 
   useEffect(() => {
-    // Only use WebSocket if NOT in Electron
-    if (isElectron) return;
-
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
     const websocket = new WebSocket(wsUrl);
@@ -173,7 +151,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     return () => {
       websocket.close();
     };
-  }, [isElectron]);
+  }, []);
 
   const sendUpdate = (type, playlistType, items) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -185,7 +163,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     }
   };
 
-  return { isElectron, sendUpdate };
+  return { sendUpdate };
 }
 
 function useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc) {
@@ -758,61 +736,20 @@ export default function App() {
   const [activeButton, setActiveButton] = useState('Live');
   const [liveShowSongs, setLiveShowSongs] = useState(true);
   const [chordsShowSongs, setChordsShowSongs] = useState(true);
-  const [serverStatus, setServerStatus] = useState('stopped');
 
   const menuBarRef = useRef(null);
   const controlButtonsRef = useRef(null);
   const rightPanelRef = useRef(null);
 
   const { isDarkMode, currentTheme, toggleTheme } = useTheme();
-  const { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading, isElectron } = useDatabase();
-  
-  // WebSocket hook for browser clients
+  const { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading } = useDatabase();
+
+  // WebSocket hook
   const { sendUpdate } = useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems);
 
   const triggerRecalc = `${liveShowSongs}-${chordsShowSongs}-${songItems.length}-${slideItems.length}`;
   const { isPortrait, leftPanelSize } = useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc);
 
-  // Initialize server on mount (Electron only)
-  useEffect(() => {
-    if (!isElectron) return;
-
-    const startServer = async () => {
-      try {
-        if (!window.electronAPI) {
-          console.warn('electronAPI not available yet');
-          setServerStatus('waiting');
-          return;
-        }
-
-        if (typeof window.electronAPI.startServer !== 'function') {
-          console.error('startServer function not implemented in electronAPI');
-          setServerStatus('not-implemented');
-          return;
-        }
-        
-        const result = await window.electronAPI.startServer(5555);
-        if (result.success) {
-          setServerStatus('running');
-          console.log('Server started on port 5555');
-        } else {
-          setServerStatus('error');
-          console.error('Failed to start server:', result.error);
-        }
-      } catch (err) {
-        setServerStatus('error');
-        console.error('Error starting server:', err);
-      }
-    };
-
-    startServer();
-
-    return () => {
-      if (window.electronAPI?.stopServer) {
-        window.electronAPI.stopServer();
-      }
-    };
-  }, [isElectron]);
 
   useEffect(() => {
     if (rightPanelRef.current && !isPortrait) {
@@ -853,11 +790,7 @@ export default function App() {
   const handleAddSong = (song) => {
     setSongItems(prev => {
       const updated = [...prev, { id: song.id, text: song.title, songData: song }];
-      if (isElectron) {
-        window.electronAPI.savePlaylist('songs', updated);
-      } else {
-        sendUpdate('updatePlaylist', 'songs', updated);
-      }
+      sendUpdate('updatePlaylist', 'songs', updated);
       return updated;
     });
   };
@@ -865,11 +798,7 @@ export default function App() {
   const handleAddSlide = (slide) => {
     setSlideItems(prev => {
       const updated = [...prev, { id: slide.id, text: slide.title, slideData: slide }];
-      if (isElectron) {
-        window.electronAPI.savePlaylist('slides', updated);
-      } else {
-        sendUpdate('updatePlaylist', 'slides', updated);
-      }
+      sendUpdate('updatePlaylist', 'slides', updated);
       return updated;
     });
   };
@@ -877,51 +806,15 @@ export default function App() {
   // Save playlists when they change
   useEffect(() => {
     if (songItems.length > 0) {
-      if (isElectron) {
-        window.electronAPI.savePlaylist('songs', songItems);
-      } else {
-        sendUpdate('updatePlaylist', 'songs', songItems);
-      }
+      sendUpdate('updatePlaylist', 'songs', songItems);
     }
-  }, [songItems, isElectron]);
+  }, [songItems]);
 
   useEffect(() => {
     if (slideItems.length > 0) {
-      if (isElectron) {
-        window.electronAPI.savePlaylist('slides', slideItems);
-      } else {
-        sendUpdate('updatePlaylist', 'slides', slideItems);
-      }
+      sendUpdate('updatePlaylist', 'slides', slideItems);
     }
-  }, [slideItems, isElectron]);
-
-  // Broadcast updates to connected clients (Electron only)
-  useEffect(() => {
-    if (!isElectron || serverStatus !== 'running') return;
-    
-    window.electronAPI.broadcastUpdate?.({
-      type: 'songItems',
-      data: songItems
-    });
-  }, [songItems, serverStatus, isElectron]);
-
-  useEffect(() => {
-    if (!isElectron || serverStatus !== 'running') return;
-    
-    window.electronAPI.broadcastUpdate?.({
-      type: 'slideItems',
-      data: slideItems
-    });
-  }, [slideItems, serverStatus, isElectron]);
-
-  useEffect(() => {
-    if (!isElectron || serverStatus !== 'running') return;
-    
-    window.electronAPI.broadcastUpdate?.({
-      type: 'activeButton',
-      data: activeButton
-    });
-  }, [activeButton, serverStatus, isElectron]);
+  }, [slideItems]);
 
   return (
     <div className={`min-h-screen ${currentTheme.bg}`}>

@@ -1,22 +1,13 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const Database = require('better-sqlite3');
 const fs = require('fs');
 
-// Try to require optional dependencies
-let express, WebSocketServer, http, createProxyMiddleware;
-try {
-  express = require('express');
-  const ws = require('ws');
-  WebSocketServer = ws.WebSocketServer;
-  http = require('http');
-  const { createProxyMiddleware: proxyMiddleware } = require('http-proxy-middleware');
-  createProxyMiddleware = proxyMiddleware;
-  console.log('WebSocket dependencies loaded successfully');
-} catch (error) {
-  console.error('Failed to load WebSocket dependencies:', error.message);
-  console.error('Please run: npm install express ws http-proxy-middleware');
-}
+const express = require('express');
+const ws = require('ws');
+const WebSocketServer = ws.WebSocketServer;
+const http = require('http');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 // Initialize database - point to your existing database file
 const dbPath = path.join(__dirname, '../web-projector.db');
@@ -52,33 +43,25 @@ function loadInitialState() {
   const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
   const songPlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
   const slidePlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
-  
+
   currentState.songs = songsStmt.all();
   currentState.slides = slidesStmt.all();
-  
+
   const songRow = songPlaylistStmt.get('songs');
   const slideRow = slidePlaylistStmt.get('slides');
-  
+
   currentState.songItems = songRow ? JSON.parse(songRow.data) : [];
   currentState.slideItems = slideRow ? JSON.parse(slideRow.data) : [];
 }
 
-ipcMain.handle('start-server', async (event, port) => {
-  try {
-    // Check if dependencies are available
-    if (!express || !WebSocketServer || !http) {
-      return { 
-        success: false, 
-        error: 'WebSocket dependencies not installed. Please run: npm install express ws' 
-      };
-    }
+async function startServer(port) {
+  if (httpServer) {
+    console.log('Server already running');
+    return;
+  }
 
-    if (httpServer) {
-      return { success: true, message: 'Server already running' };
-    }
-
-    // Load initial state
-    loadInitialState();
+  // Load initial state
+  loadInitialState();
 
     // Create Express app
     expressApp = express();
@@ -198,22 +181,16 @@ ipcMain.handle('start-server', async (event, port) => {
     });
 
     // Start server
-    await new Promise((resolve, reject) => {
-      httpServer.listen(port, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
+  await new Promise((resolve, reject) => {
+    httpServer.listen(port, (err) => {
+      if (err) reject(err);
+      else resolve();
     });
+  });
 
-    console.log(`Server started on port ${port}`);
-    console.log(`View at: http://localhost:${port}`);
-    return { success: true, port };
-
-  } catch (error) {
-    console.error('Error starting server:', error);
-    return { success: false, error: error.message };
-  }
-});
+  console.log(`Server started on port ${port}`);
+  console.log(`View at: http://localhost:${port}`);
+}
 
 function handleClientMessage(data, ws) {
   switch (data.type) {
@@ -257,192 +234,6 @@ function broadcastToAll(message) {
   });
 }
 
-ipcMain.handle('stop-server', async () => {
-  try {
-    if (wss) {
-      wss.clients.forEach(client => client.close());
-      wss.close();
-      wss = null;
-    }
-
-    if (httpServer) {
-      await new Promise((resolve) => {
-        httpServer.close(resolve);
-      });
-      httpServer = null;
-    }
-
-    expressApp = null;
-    console.log('Server stopped');
-    return { success: true };
-
-  } catch (error) {
-    console.error('Error stopping server:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-// Broadcast updates from Electron app
-ipcMain.on('broadcast-update', (event, data) => {
-  // Update current state
-  if (data.type === 'songItems') currentState.songItems = data.data;
-  if (data.type === 'slideItems') currentState.slideItems = data.data;
-  
-  // Reload songs/slides if they changed
-  if (data.type === 'songsChanged') {
-    const stmt = db.prepare('SELECT * FROM songs ORDER BY title');
-    currentState.songs = stmt.all();
-    broadcastToAll({ type: 'songs', data: currentState.songs });
-    return;
-  }
-  
-  if (data.type === 'slidesChanged') {
-    const stmt = db.prepare('SELECT * FROM slides ORDER BY title');
-    currentState.slides = stmt.all();
-    broadcastToAll({ type: 'slides', data: currentState.slides });
-    return;
-  }
-  
-  broadcastToAll(data);
-});
-
-// ============================================================================
-// IPC HANDLERS - SONGS
-// ============================================================================
-
-ipcMain.handle('db:getAllSongs', () => {
-  const stmt = db.prepare('SELECT * FROM songs ORDER BY title');
-  const result = stmt.all();
-  currentState.songs = result;
-  return result;
-});
-
-ipcMain.handle('db:getSongById', (event, id) => {
-  const stmt = db.prepare('SELECT * FROM songs WHERE id = ?');
-  return stmt.get(id);
-});
-
-ipcMain.handle('db:createSong', (event, song) => {
-  const stmt = db.prepare('INSERT INTO songs (title, lyrics, chords) VALUES (?, ?, ?)');
-  const info = stmt.run(song.title, song.lyrics || '', song.chords || '');
-  const newSong = { id: info.lastInsertRowid, ...song };
-  
-  // Update state and broadcast
-  currentState.songs = db.prepare('SELECT * FROM songs ORDER BY title').all();
-  broadcastToAll({ type: 'songs', data: currentState.songs });
-  
-  return newSong;
-});
-
-ipcMain.handle('db:updateSong', (event, id, updates) => {
-  const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(updates);
-  const stmt = db.prepare(`UPDATE songs SET ${fields} WHERE id = ?`);
-  stmt.run(...values, id);
-  
-  const getStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
-  const result = getStmt.get(id);
-  
-  // Update state and broadcast
-  currentState.songs = db.prepare('SELECT * FROM songs ORDER BY title').all();
-  broadcastToAll({ type: 'songs', data: currentState.songs });
-  
-  return result;
-});
-
-ipcMain.handle('db:deleteSong', (event, id) => {
-  const stmt = db.prepare('DELETE FROM songs WHERE id = ?');
-  stmt.run(id);
-  
-  // Update state and broadcast
-  currentState.songs = db.prepare('SELECT * FROM songs ORDER BY title').all();
-  broadcastToAll({ type: 'songs', data: currentState.songs });
-  
-  return true;
-});
-
-// ============================================================================
-// IPC HANDLERS - PLAYLIST
-// ============================================================================
-
-ipcMain.handle('db:getPlaylist', (event, type) => {
-  const stmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
-  const row = stmt.get(type);
-  const result = row ? JSON.parse(row.data) : [];
-  
-  if (type === 'songs') currentState.songItems = result;
-  else currentState.slideItems = result;
-  
-  return result;
-});
-
-ipcMain.handle('db:savePlaylist', (event, type, data) => {
-  const stmt = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
-  stmt.run(type, JSON.stringify(data));
-  
-  // Update state
-  if (type === 'songs') currentState.songItems = data;
-  else currentState.slideItems = data;
-  
-  // Don't broadcast here - it's handled by the broadcast-update in App.jsx
-  
-  return true;
-});
-
-// ============================================================================
-// IPC HANDLERS - SLIDES
-// ============================================================================
-
-ipcMain.handle('db:getAllSlides', () => {
-  const stmt = db.prepare('SELECT * FROM slides ORDER BY title');
-  const result = stmt.all();
-  currentState.slides = result;
-  return result;
-});
-
-ipcMain.handle('db:getSlideById', (event, id) => {
-  const stmt = db.prepare('SELECT * FROM slides WHERE id = ?');
-  return stmt.get(id);
-});
-
-ipcMain.handle('db:createSlide', (event, slide) => {
-  const stmt = db.prepare('INSERT INTO slides (title, content) VALUES (?, ?)');
-  const info = stmt.run(slide.title, slide.content || '');
-  const newSlide = { id: info.lastInsertRowid, ...slide };
-  
-  // Update state and broadcast
-  currentState.slides = db.prepare('SELECT * FROM slides ORDER BY title').all();
-  broadcastToAll({ type: 'slides', data: currentState.slides });
-  
-  return newSlide;
-});
-
-ipcMain.handle('db:updateSlide', (event, id, updates) => {
-  const fields = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(updates);
-  const stmt = db.prepare(`UPDATE slides SET ${fields} WHERE id = ?`);
-  stmt.run(...values, id);
-  
-  const getStmt = db.prepare('SELECT * FROM slides WHERE id = ?');
-  const result = getStmt.get(id);
-  
-  // Update state and broadcast
-  currentState.slides = db.prepare('SELECT * FROM slides ORDER BY title').all();
-  broadcastToAll({ type: 'slides', data: currentState.slides });
-  
-  return result;
-});
-
-ipcMain.handle('db:deleteSlide', (event, id) => {
-  const stmt = db.prepare('DELETE FROM slides WHERE id = ?');
-  stmt.run(id);
-  
-  // Update state and broadcast
-  currentState.slides = db.prepare('SELECT * FROM slides ORDER BY title').all();
-  broadcastToAll({ type: 'slides', data: currentState.slides });
-  
-  return true;
-});
 
 // ============================================================================
 // ELECTRON WINDOW SETUP
@@ -453,48 +244,27 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
   });
 
-  // Vite dev server or production build
+  // Always load from localhost:5555
+  mainWindow.loadURL('http://localhost:5555');
+
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-  
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173'); // Vite default port
     mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await startServer(5555);
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    // Stop server and close database
-    if (wss) {
-      wss.clients.forEach(client => client.close());
-      wss.close();
-    }
-    if (httpServer) {
-      httpServer.close();
-    }
-    db.close();
-    app.quit();
-  }
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
-});
-
-// Close database and server when app quits
-app.on('before-quit', () => {
+  // Stop server and close database
   if (wss) {
     wss.clients.forEach(client => client.close());
     wss.close();
@@ -503,4 +273,11 @@ app.on('before-quit', () => {
     httpServer.close();
   }
   db.close();
+  app.quit();
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
