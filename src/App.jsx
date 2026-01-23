@@ -650,20 +650,31 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
 
     if (!containerWidth || !containerHeight) return;
 
-    // Title takes up smaller of 15% height or 50% width, line height always 15% of container height
-    const titleLineHeight = containerHeight * 0.15;
+    // Account for padding around the entire slide (20px)
+    const totalPadding = 40; // 20px top + 20px bottom
+    const availableHeight = containerHeight - totalPadding;
+
+    // Title takes up smaller of 15% height or 50% width, line height always 15% of container height (max)
+    const titleLineHeight = availableHeight * 0.15;
+    const rectangleMaxWidth = containerWidth * 0.5;
+    const rectanglePadding = 24; // 12px left + 12px right
+    const rectangleVertPadding = 12; // 6px top + 6px bottom
+    const maxTitleWidth = rectangleMaxWidth - rectanglePadding;
+    const maxTitleHeight = titleLineHeight - rectangleVertPadding;
     
-    // Calculate title font size to fit within constraints
+    // Calculate title font size to fit within rectangle constraints, accounting for descenders
     let titleSize = 100;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
     while (titleSize > 10) {
       ctx.font = `${titleSize}px ${fontFamily}`;
-      const maxTitleWidth = titleLines.length > 0 ? Math.max(...titleLines.map(line => ctx.measureText(line).width)) : 0;
-      const maxWidth = containerWidth * 0.5;
+      const textWidth = titleLines.length > 0 ? Math.max(...titleLines.map(line => ctx.measureText(line).width)) : 0;
+      // Account for descenders - use larger multiplier for actual text height
+      const textHeight = titleSize * 1.3;
 
-      if (maxTitleWidth <= maxWidth) {
+      // Fit within both width and height constraints
+      if (textWidth <= maxTitleWidth && textHeight <= maxTitleHeight) {
         setTitleFontSize(titleSize);
         break;
       }
@@ -671,7 +682,12 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
     }
 
     // Content takes up remaining height, left justified
-    const contentHeight = containerHeight - titleLineHeight;
+    const contentHeight = availableHeight - titleLineHeight;
+    const contentPadding = 24; // 12px left + 12px right
+    const contentVertPadding = 12; // 6px top + 6px bottom
+    const maxContentWidth = containerWidth * 0.95 - contentPadding;
+    const maxContentHeight = contentHeight - contentVertPadding;
+    
     if (lines.length === 0) {
       setContentFontSize(10);
       return;
@@ -683,7 +699,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
       const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
       const totalHeight = lines.length * contentSize * 1.2;
 
-      if (maxLineWidth <= containerWidth * 0.95 && totalHeight <= contentHeight * 0.95) {
+      // Fit within both width and height constraints of the rectangle
+      if (maxLineWidth <= maxContentWidth && totalHeight <= maxContentHeight) {
         setContentFontSize(contentSize);
         return;
       }
@@ -693,7 +710,9 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
 
   if (isSlide && !isTextCleared && !isTextHidden && slideTitle) {
     // Slide layout: title + content
-    const titleLineHeight = parseFloat(leftPanelSize.height) * 0.15;
+    const totalPadding = 40; // 20px top + 20px bottom
+    const availableHeight = parseFloat(leftPanelSize.height) - totalPadding;
+    const titleLineHeight = availableHeight * 0.15;
     
     return (
       <>
@@ -705,34 +724,56 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
             maxWidth: 'none',
             minWidth: '100px',
             minHeight: '56px',
+            padding: '20px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '15px',
             ...backgroundStyle
           }}
         >
-          {/* Title Section */}
+          {/* Title Section with Rounded Rectangle */}
           <div
             style={{
               height: titleLineHeight,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              overflow: 'hidden'
+              overflow: 'visible',
+              padding: '0px'
             }}
           >
-            <pre
+            <div
               style={{
-                fontSize: `${titleFontSize}px`,
-                fontFamily: fontFamily,
-                lineHeight: 1,
-                margin: 0,
-                whiteSpace: 'pre',
-                textAlign: 'center',
-                color: 'white',
-                WebkitTextStroke: '1px black',
-                textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: '12px',
+                padding: '6px 12px',
+                width: 'fit-content',
+                maxWidth: '50%',
+                height: '90%',
+                border: '2px solid white'
               }}
             >
-              {slideTitle}
-            </pre>
+              <pre
+                style={{
+                  fontSize: `${titleFontSize}px`,
+                  fontFamily: fontFamily,
+                  lineHeight: 1.1,
+                  margin: 0,
+                  whiteSpace: 'nowrap',
+                  textAlign: 'center',
+                  color: 'white',
+                  WebkitTextStroke: '1px black',
+                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black',
+                  overflow: 'visible'
+                }}
+              >
+                {slideTitle}
+              </pre>
+            </div>
           </div>
 
           {/* Content Section */}
@@ -740,28 +781,43 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
             style={{
               flex: 1,
               display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'flex-start',
-              padding: '10px',
-              overflow: 'auto'
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'visible',
+              padding: '0px'
             }}
           >
-            <pre
+            <div
               style={{
-                fontSize: `${contentFontSize}px`,
-                fontFamily: fontFamily,
-                lineHeight: 1.2,
-                margin: 0,
-                whiteSpace: 'pre-wrap',
-                wordWrap: 'break-word',
-                textAlign: 'left',
-                color: 'white',
-                WebkitTextStroke: '1px black',
-                textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'flex-start',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                borderRadius: '12px',
+                padding: '6px 12px',
+                width: '100%',
+                height: '100%',
+                border: '2px solid white',
+                overflow: 'auto'
               }}
             >
-              {content}
-            </pre>
+              <pre
+                style={{
+                  fontSize: `${contentFontSize}px`,
+                  fontFamily: fontFamily,
+                  lineHeight: 1.2,
+                  margin: 0,
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  textAlign: 'left',
+                  color: 'white',
+                  WebkitTextStroke: '1px black',
+                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                }}
+              >
+                {content}
+              </pre>
+            </div>
           </div>
         </div>
         <ControlButtons 
