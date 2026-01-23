@@ -97,9 +97,29 @@ function useDatabase() {
 }
 
 function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems) {
-  const [ws, setWs] = useState(null);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  const settersRef = useRef({
+    setSongs,
+    setSlides,
+    setSongItems,
+    setSlideItems
+  });
 
   useEffect(() => {
+    settersRef.current = {
+      setSongs,
+      setSlides,
+      setSongItems,
+      setSlideItems
+    };
+  });
+
+  const connect = useRef(() => {
+    if (!mountedRef.current) return;
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}`;
     const websocket = new WebSocket(wsUrl);
@@ -113,24 +133,26 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
         const data = JSON.parse(event.data);
         console.log('WebSocket received:', data);
 
+        const setters = settersRef.current;
+
         switch (data.type) {
           case 'fullState':
-            setSongs(data.data.songs || []);
-            setSlides(data.data.slides || []);
-            setSongItems(data.data.songItems || []);
-            setSlideItems(data.data.slideItems || []);
+            setters.setSongs(data.data.songs || []);
+            setters.setSlides(data.data.slides || []);
+            setters.setSongItems(data.data.songItems || []);
+            setters.setSlideItems(data.data.slideItems || []);
             break;
           case 'songs':
-            setSongs(data.data);
+            setters.setSongs(data.data);
             break;
           case 'slides':
-            setSlides(data.data);
+            setters.setSlides(data.data);
             break;
           case 'songItems':
-            setSongItems(data.data);
+            setters.setSongItems(data.data);
             break;
           case 'slideItems':
-            setSlideItems(data.data);
+            setters.setSlideItems(data.data);
             break;
         }
       } catch (err) {
@@ -140,22 +162,38 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
 
     websocket.onclose = () => {
       console.log('WebSocket disconnected');
+      if (mountedRef.current) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          console.log('Reconnecting...');
+          connect.current();
+        }, 2000);
+      }
     };
 
     websocket.onerror = (error) => {
       console.error('WebSocket error:', error);
     };
 
-    setWs(websocket);
+    wsRef.current = websocket;
+  });
+
+  useEffect(() => {
+    connect.current();
 
     return () => {
-      websocket.close();
+      mountedRef.current = false;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
   }, []);
 
   const sendUpdate = (type, playlistType, items) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
         type,
         playlistType,
         items
