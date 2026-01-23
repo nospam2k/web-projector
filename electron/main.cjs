@@ -8,6 +8,7 @@ const ws = require('ws');
 const WebSocketServer = ws.WebSocketServer;
 const http = require('http');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const httpProxy = require('http-proxy');
 
 // Initialize database - point to your existing database file
 const dbPath = path.join(__dirname, '../web-projector.db');
@@ -28,6 +29,7 @@ db.exec(`
 let httpServer = null;
 let wss = null;
 let expressApp = null;
+let viteWsProxy = null;
 
 // Store current state for syncing
 let currentState = {
@@ -62,6 +64,13 @@ async function startServer(port) {
 
   // Load initial state
   loadInitialState();
+
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+  // Create proxy for Vite HMR WebSocket in dev mode
+  if (isDev) {
+    viteWsProxy = httpProxy.createProxyServer({ target: 'ws://localhost:5173', ws: true });
+  }
 
     // Create Express app
     expressApp = express();
@@ -113,7 +122,6 @@ async function startServer(port) {
 
     // Serve the React app build files or proxy to Vite in development
     const clientPath = path.join(__dirname, '../dist');
-    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
     if (fs.existsSync(clientPath)) {
       // Serve static build with no-cache headers
@@ -129,13 +137,12 @@ async function startServer(port) {
         res.sendFile(path.join(clientPath, 'index.html'));
       });
     } else if (createProxyMiddleware && isDev) {
-      // In development, proxy requests to Vite dev server so external browsers see the live app
+      // In development, proxy requests to Vite dev server
       expressApp.use('/', createProxyMiddleware({
         target: 'http://localhost:5173',
         changeOrigin: true,
-        ws: true,
+        ws: false,  // Manual WebSocket handling below
         onProxyRes: (proxyRes, req, res) => {
-          // Override cache headers from proxied server
           proxyRes.headers['cache-control'] = 'no-store, must-revalidate';
         }
       }));
@@ -153,12 +160,16 @@ async function startServer(port) {
     // Create WebSocket server on /ws path
     wss = new WebSocketServer({ noServer: true });
 
-    // Handle WebSocket upgrade on /ws path only
+    // Handle WebSocket upgrade - /ws for app, others for Vite HMR
     httpServer.on('upgrade', (request, socket, head) => {
       if (request.url === '/ws') {
+        // App WebSocket
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit('connection', ws, request);
         });
+      } else if (isDev && viteWsProxy) {
+        // Proxy Vite HMR WebSocket to port 5173
+        viteWsProxy.ws(request, socket, head);
       } else {
         socket.destroy();
       }
