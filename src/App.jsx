@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { GripVertical, Plus } from 'lucide-react';
+import { GripVertical, Plus, Trash2 } from 'lucide-react';
 
 // ============================================================================
 // CONSTANTS
@@ -512,6 +512,11 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
     }
   };
 
+  const handleDeleteItem = (index) => {
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+  };
+
   return (
     <div ref={rightPanelRef} className={`overflow-auto ${theme.rightPanel} ${isPortrait ? 'w-full' : ''}`}>
       {showToggle && (
@@ -555,6 +560,13 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
               <span className="cursor-pointer flex-1" onClick={() => handleItemClick(item)}>
                 {item.text}
               </span>
+              <button
+                onClick={() => handleDeleteItem(index)}
+                className="flex-shrink-0 p-1 rounded bg-red-500 hover:bg-red-700 text-white transition-colors"
+                title="Delete item"
+              >
+                <Trash2 size={18} />
+              </button>
               <div data-grip className="cursor-move flex-shrink-0 touch-none">
                 <GripVertical size={20} />
               </div>
