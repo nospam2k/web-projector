@@ -456,16 +456,26 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef }) {
   );
 }
 
-function ControlButtons({ theme, width, controlButtonsRef }) {
+function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle }) {
   const [isClearActive, setIsClearActive] = useState(false);
   const [isHideActive, setIsHideActive] = useState(false);
+
+  const handleClearToggle = () => {
+    setIsClearActive(!isClearActive);
+    onClearToggle?.(!isClearActive);
+  };
+
+  const handleHideToggle = () => {
+    setIsHideActive(!isHideActive);
+    onHideToggle?.(!isHideActive);
+  };
 
   return (
     <div ref={controlButtonsRef} className={`flex ${theme.leftPanel}`} style={{ width }}>
       <button
         onPointerDown={(e) => {
           e.preventDefault();
-          setIsClearActive(!isClearActive);
+          handleClearToggle();
         }}
         style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
@@ -477,7 +487,7 @@ function ControlButtons({ theme, width, controlButtonsRef }) {
       <button
         onPointerDown={(e) => {
           e.preventDefault();
-          setIsHideActive(!isHideActive);
+          handleHideToggle();
         }}
         style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
@@ -580,6 +590,8 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
 
 function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage }) {
   const [fontSize, setFontSize] = useState(40);
+  const [isTextCleared, setIsTextCleared] = useState(false);
+  const [isTextHidden, setIsTextHidden] = useState(false);
   const textRef = useRef(null);
   const fontFamily = 'Arial Black';
 
@@ -588,8 +600,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
   const lines = content.split('\n').filter(line => line.trim());
 
   const backgroundStyle = {
-    backgroundColor: liveBackgroundColor,
-    backgroundImage: liveBackgroundImage ? `url(${liveBackgroundImage})` : 'none',
+    backgroundColor: isTextHidden ? '#000000' : liveBackgroundColor,
+    backgroundImage: isTextHidden ? 'none' : (liveBackgroundImage ? `url(${liveBackgroundImage})` : 'none'),
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat'
@@ -635,21 +647,29 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
           ...backgroundStyle
         }}
       >
-        <pre style={{
-          fontSize: `${fontSize}px`,
-          fontFamily: fontFamily,
-          lineHeight: 1.2,
-          margin: 0,
-          whiteSpace: 'pre',
-          textAlign: 'center',
-          color: 'white',
-          WebkitTextStroke: '1px black',
-          textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
-        }}>
-          {content}
-        </pre>
+        {!isTextCleared && !isTextHidden && (
+          <pre style={{
+            fontSize: `${fontSize}px`,
+            fontFamily: fontFamily,
+            lineHeight: 1.2,
+            margin: 0,
+            whiteSpace: 'pre',
+            textAlign: 'center',
+            color: 'white',
+            WebkitTextStroke: '1px black',
+            textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+          }}>
+            {content}
+          </pre>
+        )}
       </div>
-      <ControlButtons theme={theme} width={leftPanelSize.width} controlButtonsRef={controlButtonsRef} />
+      <ControlButtons 
+        theme={theme} 
+        width={leftPanelSize.width} 
+        controlButtonsRef={controlButtonsRef}
+        onClearToggle={setIsTextCleared}
+        onHideToggle={setIsTextHidden}
+      />
     </>
   );
 }
