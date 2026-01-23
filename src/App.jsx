@@ -117,16 +117,38 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     };
   });
 
-  const connect = useRef(() => {
+  const connect = useRef(async () => {
     if (!mountedRef.current) return;
 
+    // Test API connectivity first
+    try {
+      const testRes = await fetch('/api/test');
+      const testData = await testRes.json();
+      console.log('[CLIENT] API test:', testData);
+    } catch (err) {
+      console.error('[CLIENT] API test failed:', err);
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    console.log('Attempting WebSocket connection to:', wsUrl);
-    const websocket = new WebSocket(wsUrl);
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws`;
+    console.log('[CLIENT] Attempting WebSocket connection');
+    console.log('[CLIENT] Protocol:', protocol);
+    console.log('[CLIENT] Host:', host);
+    console.log('[CLIENT] Full URL:', wsUrl);
+    console.log('[CLIENT] Current page location:', window.location.href);
+
+    let websocket;
+    try {
+      websocket = new WebSocket(wsUrl);
+      console.log('[CLIENT] WebSocket object created, readyState:', websocket.readyState);
+    } catch (err) {
+      console.error('[CLIENT] Failed to create WebSocket:', err);
+      return;
+    }
 
     websocket.onopen = () => {
-      console.log('WebSocket connected to', wsUrl);
+      console.log('[CLIENT] WebSocket OPENED, readyState:', websocket.readyState);
     };
 
     websocket.onmessage = (event) => {
@@ -169,10 +191,14 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     };
 
     websocket.onclose = (event) => {
-      console.log('WebSocket disconnected', event.code, event.reason);
+      console.log('[CLIENT] WebSocket CLOSED');
+      console.log('[CLIENT] Close code:', event.code);
+      console.log('[CLIENT] Close reason:', event.reason);
+      console.log('[CLIENT] Was clean:', event.wasClean);
+      console.log('[CLIENT] ReadyState:', websocket.readyState);
       // Only reconnect on abnormal closure (not user-initiated)
       if (mountedRef.current && event.code !== 1000 && event.code !== 1001) {
-        console.log('Reconnecting in 2s...');
+        console.log('[CLIENT] Reconnecting in 2s...');
         reconnectTimeoutRef.current = setTimeout(() => {
           connect.current();
         }, 2000);
@@ -180,7 +206,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     };
 
     websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[CLIENT] WebSocket ERROR');
+      console.error('[CLIENT] Error event:', error);
+      console.error('[CLIENT] ReadyState at error:', websocket.readyState);
     };
 
     wsRef.current = websocket;

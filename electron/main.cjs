@@ -99,25 +99,30 @@ async function startServer(port) {
     expressApp.post('/api/playlist/:type', (req, res) => {
       const type = req.params.type;
       const data = req.body;
-      
+
       // Update database
       const stmt = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
       stmt.run(type, JSON.stringify(data));
-      
+
       // Update state
       if (type === 'songs') {
         currentState.songItems = data;
       } else {
         currentState.slideItems = data;
       }
-      
+
       // Broadcast to all clients
       broadcastToAll({
         type: type === 'songs' ? 'songItems' : 'slideItems',
         data: data
       });
-      
+
       res.json({ success: true });
+    });
+
+    // Test endpoint to verify API works
+    expressApp.get('/api/test', (req, res) => {
+      res.json({ status: 'ok', message: 'API server is working' });
     });
 
     // Serve the React app build files or proxy to Vite in development
@@ -162,20 +167,24 @@ async function startServer(port) {
 
     // Handle WebSocket upgrade - /ws for app, others for Vite HMR
     httpServer.on('upgrade', (request, socket, head) => {
-      console.log('WebSocket upgrade request:', request.url);
+      const url = request.url;
+      console.log('[UPGRADE] Request:', url, 'Headers:', request.headers.upgrade);
 
-      if (request.url === '/ws') {
+      // Parse URL to check path without query params
+      const pathname = url.split('?')[0];
+
+      if (pathname === '/ws') {
         // App WebSocket
-        console.log('Handling /ws upgrade for app WebSocket');
+        console.log('[UPGRADE] Handling /ws for app WebSocket');
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit('connection', ws, request);
         });
       } else if (isDev && viteWsProxy) {
         // Proxy Vite HMR WebSocket to port 5173
-        console.log('Proxying WebSocket to Vite:', request.url);
+        console.log('[UPGRADE] Proxying to Vite:', url);
         viteWsProxy.ws(request, socket, head);
       } else {
-        console.log('Destroying WebSocket connection:', request.url);
+        console.log('[UPGRADE] Destroying unknown connection:', url);
         socket.destroy();
       }
     });
@@ -229,6 +238,8 @@ async function startServer(port) {
 
   console.log(`Server started on port ${port}`);
   console.log(`View at: http://localhost:${port}`);
+  console.log(`WebSocket endpoint: ws://localhost:${port}/ws`);
+  console.log(`Upgrade listeners registered:`, httpServer.listenerCount('upgrade'));
 }
 
 function handleClientMessage(data, ws) {
