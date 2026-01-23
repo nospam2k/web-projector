@@ -591,14 +591,19 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
 
 function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem }) {
   const [fontSize, setFontSize] = useState(40);
+  const [titleFontSize, setTitleFontSize] = useState(40);
+  const [contentFontSize, setContentFontSize] = useState(30);
   const [isTextCleared, setIsTextCleared] = useState(false);
   const [isTextHidden, setIsTextHidden] = useState(false);
   const textRef = useRef(null);
   const fontFamily = 'Arial Black';
 
   const displayItem = selectedLiveItem || currentItems[0];
+  const isSlide = !!displayItem?.slideData;
   const content = displayItem?.songData?.lyrics || displayItem?.slideData?.content || '';
+  const slideTitle = displayItem?.slideData?.title || '';
   const lines = content.split('\n').filter(line => line.trim());
+  const titleLines = slideTitle.split('\n').filter(line => line.trim());
 
   const backgroundStyle = {
     backgroundColor: isTextHidden ? '#000000' : liveBackgroundColor,
@@ -608,7 +613,9 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
     backgroundRepeat: 'no-repeat'
   };
 
+  // Font calculation for songs (centered, original logic)
   useEffect(() => {
+    if (isSlide) return; // Skip for slides
     if (!textRef.current || !lines.length) return;
 
     const containerWidth = parseFloat(leftPanelSize.width);
@@ -632,8 +639,143 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
       }
       size -= 2;
     }
-  }, [leftPanelSize, lines, fontFamily, content, currentItems]);
+  }, [leftPanelSize, lines, fontFamily, content, currentItems, isSlide]);
 
+  // Font calculation for slides (title + content layout)
+  useEffect(() => {
+    if (!isSlide) return; // Skip for songs
+    
+    const containerWidth = parseFloat(leftPanelSize.width);
+    const containerHeight = parseFloat(leftPanelSize.height);
+
+    if (!containerWidth || !containerHeight) return;
+
+    // Title takes up smaller of 15% height or 50% width, line height always 15% of container height
+    const titleLineHeight = containerHeight * 0.15;
+    
+    // Calculate title font size to fit within constraints
+    let titleSize = 100;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    while (titleSize > 10) {
+      ctx.font = `${titleSize}px ${fontFamily}`;
+      const maxTitleWidth = titleLines.length > 0 ? Math.max(...titleLines.map(line => ctx.measureText(line).width)) : 0;
+      const maxWidth = containerWidth * 0.5;
+
+      if (maxTitleWidth <= maxWidth) {
+        setTitleFontSize(titleSize);
+        break;
+      }
+      titleSize -= 2;
+    }
+
+    // Content takes up remaining height, left justified
+    const contentHeight = containerHeight - titleLineHeight;
+    if (lines.length === 0) {
+      setContentFontSize(10);
+      return;
+    }
+
+    let contentSize = 100;
+    while (contentSize > 10) {
+      ctx.font = `${contentSize}px ${fontFamily}`;
+      const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+      const totalHeight = lines.length * contentSize * 1.2;
+
+      if (maxLineWidth <= containerWidth * 0.95 && totalHeight <= contentHeight * 0.95) {
+        setContentFontSize(contentSize);
+        return;
+      }
+      contentSize -= 2;
+    }
+  }, [leftPanelSize, titleLines, lines, fontFamily, isSlide]);
+
+  if (isSlide && !isTextCleared && !isTextHidden && slideTitle) {
+    // Slide layout: title + content
+    const titleLineHeight = parseFloat(leftPanelSize.height) * 0.15;
+    
+    return (
+      <>
+        <div
+          className="flex-shrink-0 relative overflow-hidden flex flex-col"
+          style={{
+            width: leftPanelSize.width,
+            height: leftPanelSize.height,
+            maxWidth: 'none',
+            minWidth: '100px',
+            minHeight: '56px',
+            ...backgroundStyle
+          }}
+        >
+          {/* Title Section */}
+          <div
+            style={{
+              height: titleLineHeight,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden'
+            }}
+          >
+            <pre
+              style={{
+                fontSize: `${titleFontSize}px`,
+                fontFamily: fontFamily,
+                lineHeight: 1,
+                margin: 0,
+                whiteSpace: 'pre',
+                textAlign: 'center',
+                color: 'white',
+                WebkitTextStroke: '1px black',
+                textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+              }}
+            >
+              {slideTitle}
+            </pre>
+          </div>
+
+          {/* Content Section */}
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-start',
+              padding: '10px',
+              overflow: 'auto'
+            }}
+          >
+            <pre
+              style={{
+                fontSize: `${contentFontSize}px`,
+                fontFamily: fontFamily,
+                lineHeight: 1.2,
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordWrap: 'break-word',
+                textAlign: 'left',
+                color: 'white',
+                WebkitTextStroke: '1px black',
+                textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+              }}
+            >
+              {content}
+            </pre>
+          </div>
+        </div>
+        <ControlButtons 
+          theme={theme} 
+          width={leftPanelSize.width} 
+          controlButtonsRef={controlButtonsRef}
+          onClearToggle={setIsTextCleared}
+          onHideToggle={setIsTextHidden}
+        />
+      </>
+    );
+  }
+
+  // Song layout: centered content (original layout)
   return (
     <>
       <div
