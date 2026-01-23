@@ -150,8 +150,19 @@ async function startServer(port) {
     // Create HTTP server
     httpServer = http.createServer(expressApp);
 
-    // Create WebSocket server
-    wss = new WebSocketServer({ server: httpServer });
+    // Create WebSocket server on /ws path
+    wss = new WebSocketServer({ noServer: true });
+
+    // Handle WebSocket upgrade on /ws path only
+    httpServer.on('upgrade', (request, socket, head) => {
+      if (request.url === '/ws') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
 
     // Handle WebSocket connections
     wss.on('connection', (ws) => {

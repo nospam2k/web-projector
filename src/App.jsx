@@ -121,7 +121,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     if (!mountedRef.current) return;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
@@ -160,11 +160,12 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
       }
     };
 
-    websocket.onclose = () => {
-      console.log('WebSocket disconnected');
-      if (mountedRef.current) {
+    websocket.onclose = (event) => {
+      console.log('WebSocket disconnected', event.code, event.reason);
+      // Only reconnect on abnormal closure (not user-initiated)
+      if (mountedRef.current && event.code !== 1000 && event.code !== 1001) {
+        console.log('Reconnecting in 2s...');
         reconnectTimeoutRef.current = setTimeout(() => {
-          console.log('Reconnecting...');
           connect.current();
         }, 2000);
       }
