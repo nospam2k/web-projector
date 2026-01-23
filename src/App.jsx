@@ -122,21 +122,29 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
+    console.log('Attempting WebSocket connection to:', wsUrl);
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('WebSocket connected to', wsUrl);
     };
 
     websocket.onmessage = (event) => {
       try {
+        console.log('WebSocket message received, size:', event.data.length, 'bytes');
         const data = JSON.parse(event.data);
-        console.log('WebSocket received:', data);
+        console.log('WebSocket received:', data.type);
 
         const setters = settersRef.current;
 
         switch (data.type) {
           case 'fullState':
+            console.log('Setting full state:', {
+              songs: data.data.songs?.length,
+              slides: data.data.slides?.length,
+              songItems: data.data.songItems?.length,
+              slideItems: data.data.slideItems?.length
+            });
             setters.setSongs(data.data.songs || []);
             setters.setSlides(data.data.slides || []);
             setters.setSongItems(data.data.songItems || []);
@@ -156,7 +164,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
             break;
         }
       } catch (err) {
-        console.error('Error parsing WebSocket message:', err);
+        console.error('Error parsing WebSocket message:', err, event.data);
       }
     };
 

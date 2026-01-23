@@ -162,34 +162,47 @@ async function startServer(port) {
 
     // Handle WebSocket upgrade - /ws for app, others for Vite HMR
     httpServer.on('upgrade', (request, socket, head) => {
+      console.log('WebSocket upgrade request:', request.url);
+
       if (request.url === '/ws') {
         // App WebSocket
+        console.log('Handling /ws upgrade for app WebSocket');
         wss.handleUpgrade(request, socket, head, (ws) => {
           wss.emit('connection', ws, request);
         });
       } else if (isDev && viteWsProxy) {
         // Proxy Vite HMR WebSocket to port 5173
+        console.log('Proxying WebSocket to Vite:', request.url);
         viteWsProxy.ws(request, socket, head);
       } else {
+        console.log('Destroying WebSocket connection:', request.url);
         socket.destroy();
       }
     });
 
     // Handle WebSocket connections
     wss.on('connection', (ws) => {
-      console.log('Client connected');
+      console.log('Client connected to /ws');
 
       // Send full state to newly connected client
-      ws.send(JSON.stringify({
-        type: 'fullState',
-        data: currentState
-      }));
+      try {
+        const stateMessage = JSON.stringify({
+          type: 'fullState',
+          data: currentState
+        });
+        console.log('Sending initial state, size:', stateMessage.length, 'bytes');
+        ws.send(stateMessage);
+        console.log('Initial state sent successfully');
+      } catch (err) {
+        console.error('Error sending initial state:', err);
+        console.error('Current state:', currentState);
+      }
 
       ws.on('message', (message) => {
         try {
           const data = JSON.parse(message.toString());
           console.log('Received from client:', data);
-          
+
           // Handle different message types from clients
           handleClientMessage(data, ws);
         } catch (err) {
@@ -197,8 +210,12 @@ async function startServer(port) {
         }
       });
 
-      ws.on('close', () => {
-        console.log('Client disconnected');
+      ws.on('close', (code, reason) => {
+        console.log('Client disconnected:', code, reason.toString());
+      });
+
+      ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
       });
     });
 
