@@ -512,13 +512,14 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
   );
 }
 
-function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle }) {
+function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle, onItemClick }) {
   const [selectedItem, setSelectedItem] = useState(null);
 
   const handleItemClick = (item) => {
     if (!dragHandlers.isDragging) {
       setSelectedItem(item.id);
       console.log(`Clicked: ${item.text}`);
+      onItemClick?.(item);
     }
   };
 
@@ -588,15 +589,15 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem }) {
   const [fontSize, setFontSize] = useState(40);
   const [isTextCleared, setIsTextCleared] = useState(false);
   const [isTextHidden, setIsTextHidden] = useState(false);
   const textRef = useRef(null);
   const fontFamily = 'Arial Black';
 
-  const currentItem = currentItems[0];
-  const content = currentItem?.songData?.lyrics || currentItem?.slideData?.content || '';
+  const displayItem = selectedLiveItem || currentItems[0];
+  const content = displayItem?.songData?.lyrics || displayItem?.slideData?.content || '';
   const lines = content.split('\n').filter(line => line.trim());
 
   const backgroundStyle = {
@@ -818,11 +819,11 @@ function SlidesPanel({ theme, slides, loading, onAddSlide }) {
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
-        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} />;
+        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} />;
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} />;
       case 'Songs':
@@ -1010,6 +1011,7 @@ export default function App() {
   const [chordsToggleSongs, setChordsToggleSongs] = useState(true);
   const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
   const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
+  const [selectedLiveItem, setSelectedLiveItem] = useState(null);
 
   const menuBarRef = useRef(null);
   const controlButtonsRef = useRef(null);
@@ -1142,6 +1144,7 @@ export default function App() {
             currentItems={currentItems}
             liveBackgroundColor={liveBackgroundColor}
             liveBackgroundImage={liveBackgroundImage}
+            selectedLiveItem={selectedLiveItem}
           />
 
           <RightPanel
@@ -1163,6 +1166,7 @@ export default function App() {
                 setChordsToggleSongs(!chordsToggleSongs);
               }
             }}
+            onItemClick={setSelectedLiveItem}
           />
         </div>
       )}
