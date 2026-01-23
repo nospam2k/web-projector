@@ -238,11 +238,16 @@ function useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc) 
   return { isPortrait, leftPanelSize };
 }
 
-function useDragAndDrop(items, setItems) {
+function useDragAndDrop(items, setItems, onDragEnd) {
   const [draggedItem, setDraggedItem] = useState(null);
   const [touchStartY, setTouchStartY] = useState(null);
   const [touchOffset, setTouchOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const handleDragStart = (e, index) => {
     setDraggedItem(index);
@@ -260,7 +265,13 @@ function useDragAndDrop(items, setItems) {
     setItems(newItems);
   };
 
-  const handleDragEnd = () => setDraggedItem(null);
+  const handleDragEnd = () => {
+    const wasDragging = draggedItem !== null;
+    setDraggedItem(null);
+    if (wasDragging && onDragEnd) {
+      setTimeout(() => onDragEnd(itemsRef.current), 0);
+    }
+  };
 
   const handleMouseDown = (e) => {
     const target = e.target.closest('svg, [data-grip]');
@@ -322,10 +333,14 @@ function useDragAndDrop(items, setItems) {
   };
 
   const handleTouchEnd = () => {
+    const wasDragging = draggedItem !== null;
     setDraggedItem(null);
     setTouchStartY(null);
     setTouchOffset(0);
     setTimeout(() => setIsDragging(false), 100);
+    if (wasDragging && onDragEnd) {
+      setTimeout(() => onDragEnd(itemsRef.current), 0);
+    }
   };
 
   return {
@@ -780,7 +795,17 @@ export default function App() {
     : activeButton === 'Chords' ? (chordsShowSongs ? setSongItems : setSlideItems)
     : setSongItems;
 
-  const dragHandlers = useDragAndDrop(currentItems, setCurrentItems);
+  const currentPlaylistType = activeButton === 'Songs' ? 'songs'
+    : activeButton === 'Slides' ? 'slides'
+    : activeButton === 'Live' ? (liveShowSongs ? 'songs' : 'slides')
+    : activeButton === 'Chords' ? (chordsShowSongs ? 'songs' : 'slides')
+    : 'songs';
+
+  const handleDragEnd = (finalItems) => {
+    sendUpdate('updatePlaylist', currentPlaylistType, finalItems);
+  };
+
+  const dragHandlers = useDragAndDrop(currentItems, setCurrentItems, handleDragEnd);
 
   const handleButtonClick = (buttonName) => {
     setActiveButton(buttonName);
@@ -802,19 +827,6 @@ export default function App() {
       return updated;
     });
   };
-
-  // Save playlists when they change
-  useEffect(() => {
-    if (songItems.length > 0) {
-      sendUpdate('updatePlaylist', 'songs', songItems);
-    }
-  }, [songItems]);
-
-  useEffect(() => {
-    if (slideItems.length > 0) {
-      sendUpdate('updatePlaylist', 'slides', slideItems);
-    }
-  }, [slideItems]);
 
   return (
     <div className={`min-h-screen ${currentTheme.bg}`}>
