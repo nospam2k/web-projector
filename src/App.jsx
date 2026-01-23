@@ -578,7 +578,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage }) {
   const [fontSize, setFontSize] = useState(40);
   const textRef = useRef(null);
   const fontFamily = 'Arial Black';
@@ -586,6 +586,14 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems }) {
   const currentItem = currentItems[0];
   const content = currentItem?.songData?.lyrics || currentItem?.slideData?.content || '';
   const lines = content.split('\n').filter(line => line.trim());
+
+  const backgroundStyle = {
+    backgroundColor: liveBackgroundColor,
+    backgroundImage: liveBackgroundImage ? `url(${liveBackgroundImage})` : 'none',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat'
+  };
 
   useEffect(() => {
     if (!textRef.current || !lines.length) return;
@@ -617,13 +625,14 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems }) {
     <>
       <div
         ref={textRef}
-        className={`${theme.leftPanel} flex-shrink-0 relative overflow-hidden flex items-center justify-center`}
+        className="flex-shrink-0 relative overflow-hidden flex items-center justify-center"
         style={{
           width: leftPanelSize.width,
           height: leftPanelSize.height,
           maxWidth: 'none',
           minWidth: '100px',
-          minHeight: '56px'
+          minHeight: '56px',
+          ...backgroundStyle
         }}
       >
         <pre style={{
@@ -789,11 +798,11 @@ function SlidesPanel({ theme, slides, loading, onAddSlide }) {
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
-        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} />;
+        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} />;
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} />;
       case 'Songs':
@@ -812,9 +821,79 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
   );
 }
 
-function SettingsPanel({ theme, isDarkMode, toggleTheme }) {
+function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage }) {
+  const [thumbnails, setThumbnails] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchThumbnails();
+  }, []);
+
+  const fetchThumbnails = async () => {
+    try {
+      const response = await fetch('/api/thumbnails');
+      const data = await response.json();
+      setThumbnails(data);
+    } catch (err) {
+      console.error('Failed to fetch thumbnails:', err);
+    }
+  };
+
+  const handleThumbnailUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/thumbnails/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      if (data.success) {
+        fetchThumbnails();
+      }
+    } catch (err) {
+      console.error('Failed to upload thumbnail:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleThumbnailSelect = (thumbnailPath) => {
+    setLiveBackgroundImage(thumbnailPath);
+  };
+
+  const handleThumbnailDelete = async (filename) => {
+    if (!window.confirm(`Delete thumbnail "${filename}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/thumbnails/${filename}`, {
+        method: 'DELETE'
+      });
+      const data = await response.json();
+      if (data.success) {
+        if (liveBackgroundImage?.includes(filename)) {
+          setLiveBackgroundImage(null);
+        }
+        fetchThumbnails();
+      }
+    } catch (err) {
+      console.error('Failed to delete thumbnail:', err);
+    }
+  };
+
+  const clearBackgroundImage = () => {
+    setLiveBackgroundImage(null);
+  };
+
   return (
-    <div className={`p-8 ${theme.bg} overflow-auto`}>
+    <div className={`p-8 ${theme.bg} overflow-auto h-full`}>
       <div className={`space-y-4 ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
         <div className={`flex items-center justify-between p-4 rounded border ${theme.border}`}>
           <span className="font-semibold">Theme</span>
@@ -824,6 +903,77 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme }) {
           >
             {isDarkMode ? 'Dark' : 'Light'}
           </button>
+        </div>
+
+        <div className="border-t pt-4 mt-4">
+          <h3 className="font-semibold mb-4">Live Display Background</h3>
+          
+          <div className={`p-4 rounded border ${theme.border} mb-4`}>
+            <label className="block mb-2 text-sm">Background Color</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={liveBackgroundColor}
+                onChange={(e) => setLiveBackgroundColor(e.target.value)}
+                className="w-16 h-10 cursor-pointer rounded"
+              />
+              <span className="text-sm">{liveBackgroundColor}</span>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded border ${theme.border} mb-4`}>
+            <label className="block mb-2 text-sm">Upload Background Image (JPG)</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/jpg"
+              onChange={handleThumbnailUpload}
+              disabled={loading}
+              className="block w-full text-sm"
+            />
+            {loading && <p className="text-xs text-blue-600 mt-2">Uploading...</p>}
+          </div>
+
+          <div className={`p-4 rounded border ${theme.border}`}>
+            {thumbnails.length === 0 ? (
+              <p className="text-xs text-gray-500">No thumbnails saved yet</p>
+            ) : (
+              <div className="grid grid-cols-9 gap-2">
+                {thumbnails.map((thumb) => (
+                  <div key={thumb.filename} className="relative group">
+                    <div
+                      onClick={() => handleThumbnailSelect(thumb.path)}
+                      className={`cursor-pointer overflow-hidden rounded transition-all hover:opacity-75 border-2 ${
+                        liveBackgroundImage?.includes(thumb.filename)
+                          ? 'border-blue-500'
+                          : isDarkMode ? 'border-gray-600' : 'border-gray-300'
+                      }`}
+                      style={{ paddingBottom: '56.25%', position: 'relative' }}
+                    >
+                      <img
+                        src={thumb.path}
+                        alt="thumbnail"
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handleThumbnailDelete(thumb.filename)}
+                      className="absolute top-1 right-1 bg-red-500 hover:bg-red-700 text-white rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete thumbnail"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -838,6 +988,8 @@ export default function App() {
   const [activeButton, setActiveButton] = useState('Live');
   const [liveToggleSongs, setLiveToggleSongs] = useState(true);
   const [chordsToggleSongs, setChordsToggleSongs] = useState(true);
+  const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
+  const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
 
   const menuBarRef = useRef(null);
   const controlButtonsRef = useRef(null);
@@ -949,6 +1101,10 @@ export default function App() {
           theme={currentTheme}
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
+          liveBackgroundColor={liveBackgroundColor}
+          setLiveBackgroundColor={setLiveBackgroundColor}
+          liveBackgroundImage={liveBackgroundImage}
+          setLiveBackgroundImage={setLiveBackgroundImage}
         />
       ) : (
         <div className={`flex h-[calc(100vh-60px)] overflow-hidden ${isPortrait ? 'flex-col' : 'flex-row'}`}>
@@ -964,6 +1120,8 @@ export default function App() {
             onAddSong={handleAddSong}
             onAddSlide={handleAddSlide}
             currentItems={currentItems}
+            liveBackgroundColor={liveBackgroundColor}
+            liveBackgroundImage={liveBackgroundImage}
           />
 
           <RightPanel

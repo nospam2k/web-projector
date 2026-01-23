@@ -4,6 +4,7 @@ const Database = require('better-sqlite3');
 const fs = require('fs');
 
 const express = require('express');
+const multer = require('multer');
 const ws = require('ws');
 const WebSocketServer = ws.WebSocketServer;
 const http = require('http');
@@ -13,6 +14,32 @@ const httpProxy = require('http-proxy');
 // Initialize database - point to your existing database file
 const dbPath = path.join(__dirname, '../web-projector.db');
 const db = new Database(dbPath);
+
+// Setup thumbnails folder
+const thumbnailsFolder = path.join(app.getPath('userData'), 'thumbnails');
+if (!fs.existsSync(thumbnailsFolder)) {
+  fs.mkdirSync(thumbnailsFolder, { recursive: true });
+}
+
+// Setup multer for thumbnail uploads
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, thumbnailsFolder);
+    },
+    filename: (req, file, cb) => {
+      const timestamp = Date.now();
+      cb(null, `thumbnail-${timestamp}.jpg`);
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/jpg') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG files are allowed'), false);
+    }
+  }
+});
 
 // Ensure playlists table exists
 db.exec(`
@@ -123,6 +150,65 @@ async function startServer(port) {
     // Test endpoint to verify API works
     expressApp.get('/api/test', (req, res) => {
       res.json({ status: 'ok', message: 'API server is working' });
+    });
+
+    // Thumbnail endpoints
+    expressApp.post('/api/thumbnails/upload', upload.single('file'), (req, res) => {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      res.json({ 
+        success: true, 
+        filename: req.file.filename,
+        path: `/api/thumbnails/${req.file.filename}`
+      });
+    });
+
+    expressApp.get('/api/thumbnails', (req, res) => {
+      try {
+        const files = fs.readdirSync(thumbnailsFolder)
+          .filter(file => file.startsWith('thumbnail-') && file.endsWith('.jpg'))
+          .map(file => ({
+            filename: file,
+            path: `/api/thumbnails/${file}`,
+            created: fs.statSync(path.join(thumbnailsFolder, file)).birthtime
+          }))
+          .sort((a, b) => b.created - a.created);
+        res.json(files);
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to read thumbnails' });
+      }
+    });
+
+    expressApp.get('/api/thumbnails/:filename', (req, res) => {
+      const filename = req.params.filename;
+      // Validate filename to prevent directory traversal
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+      const filePath = path.join(thumbnailsFolder, filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Thumbnail not found' });
+      }
+      res.sendFile(filePath);
+    });
+
+    expressApp.delete('/api/thumbnails/:filename', (req, res) => {
+      const filename = req.params.filename;
+      // Validate filename to prevent directory traversal
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        return res.status(400).json({ error: 'Invalid filename' });
+      }
+      const filePath = path.join(thumbnailsFolder, filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Thumbnail not found' });
+      }
+      try {
+        fs.unlinkSync(filePath);
+        res.json({ success: true });
+      } catch (err) {
+        res.status(500).json({ error: 'Failed to delete thumbnail' });
+      }
     });
 
     // Serve the React app build files or proxy to Vite in development
