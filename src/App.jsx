@@ -836,8 +836,8 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme }) {
 
 export default function App() {
   const [activeButton, setActiveButton] = useState('Live');
-  const [liveShowSongs, setLiveShowSongs] = useState(true);
-  const [chordsShowSongs, setChordsShowSongs] = useState(true);
+  const [liveToggleSongs, setLiveToggleSongs] = useState(true);
+  const [chordsToggleSongs, setChordsToggleSongs] = useState(true);
 
   const menuBarRef = useRef(null);
   const controlButtonsRef = useRef(null);
@@ -849,7 +849,7 @@ export default function App() {
   // WebSocket hook
   const { sendUpdate } = useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems);
 
-  const triggerRecalc = `${liveShowSongs}-${chordsShowSongs}-${songItems.length}-${slideItems.length}`;
+  const triggerRecalc = `${liveToggleSongs}-${chordsToggleSongs}-${songItems.length}-${slideItems.length}`;
   const { isPortrait, leftPanelSize } = useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc);
 
 
@@ -872,21 +872,41 @@ export default function App() {
 
   const currentItems = activeButton === 'Songs' ? songItems
     : activeButton === 'Slides' ? slideItems
-    : activeButton === 'Live' ? (liveShowSongs ? songItems : slideItems)
-    : activeButton === 'Chords' ? (chordsShowSongs ? songItems : slideItems)
+    : activeButton === 'Live' ? songItems
+    : activeButton === 'Chords' ? songItems
     : songItems;
 
   const setCurrentItems = activeButton === 'Songs' ? setSongItems
     : activeButton === 'Slides' ? setSlideItems
-    : activeButton === 'Live' ? (liveShowSongs ? setSongItems : setSlideItems)
-    : activeButton === 'Chords' ? (chordsShowSongs ? setSongItems : setSlideItems)
+    : activeButton === 'Live' ? setSongItems
+    : activeButton === 'Chords' ? setSongItems
     : setSongItems;
 
-  const currentPlaylistType = activeButton === 'Songs' ? 'songs'
-    : activeButton === 'Slides' ? 'slides'
-    : activeButton === 'Live' ? (liveShowSongs ? 'songs' : 'slides')
-    : activeButton === 'Chords' ? (chordsShowSongs ? 'songs' : 'slides')
-    : 'songs';
+  const getRightPanelItems = () => {
+    if (activeButton === 'Songs' || activeButton === 'Slides') {
+      return currentItems;
+    }
+    if (activeButton === 'Live') {
+      return liveToggleSongs ? songItems : slideItems;
+    }
+    if (activeButton === 'Chords') {
+      return chordsToggleSongs ? songItems : slideItems;
+    }
+    return currentItems;
+  };
+
+  const getRightPanelSetItems = () => {
+    if (activeButton === 'Songs' || activeButton === 'Slides') {
+      return setCurrentItems;
+    }
+    if (activeButton === 'Live') {
+      return liveToggleSongs ? setSongItems : setSlideItems;
+    }
+    if (activeButton === 'Chords') {
+      return chordsToggleSongs ? setSongItems : setSlideItems;
+    }
+    return setCurrentItems;
+  };
 
   const handleDragEnd = (finalItems) => {
     sendUpdate('updatePlaylist', currentPlaylistType, finalItems);
@@ -948,21 +968,21 @@ export default function App() {
 
           <RightPanel
             key={triggerRecalc}
-            items={currentItems}
-            setItems={setCurrentItems}
+            items={getRightPanelItems()}
+            setItems={getRightPanelSetItems()}
             theme={currentTheme}
             isPortrait={isPortrait}
             rightPanelRef={rightPanelRef}
             dragHandlers={dragHandlers}
             showToggle={activeButton === 'Live' || activeButton === 'Chords'}
             toggleLabel={activeButton === 'Live'
-              ? (liveShowSongs ? 'Slides' : 'Songs')
-              : (chordsShowSongs ? 'Slides' : 'Songs')}
+              ? (liveToggleSongs ? 'Slides' : 'Songs')
+              : (chordsToggleSongs ? 'Slides' : 'Songs')}
             onToggle={() => {
               if (activeButton === 'Live') {
-                setLiveShowSongs(!liveShowSongs);
+                setLiveToggleSongs(!liveToggleSongs);
               } else {
-                setChordsShowSongs(!chordsShowSongs);
+                setChordsToggleSongs(!chordsToggleSongs);
               }
             }}
           />
