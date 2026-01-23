@@ -528,7 +528,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
         <ul className="space-y-2 relative">
           {items.map((item, index) => (
             <li
-              key={item.id}
+              key={`${item.id}-${index}`}
               data-item-index={index}
               draggable
               onDragStart={(e) => dragHandlers.handleDragStart(e, index)}
