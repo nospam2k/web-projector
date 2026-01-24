@@ -22,10 +22,10 @@ const THEMES = {
     menuBar: 'bg-black',
     menuButton: 'bg-blue-700 text-white hover:bg-blue-600 focus:outline-none focus:bg-blue-600 active:bg-blue-600',
     menuButtonActive: 'bg-blue-500 text-white focus:outline-none focus:bg-blue-500 active:bg-blue-500',
-    leftPanel: 'bg-gray-800 text-gray-100',
-    listItem: 'bg-gray-700 text-gray-100 hover:bg-gray-600 focus:outline-none',
-    listItemActive: 'bg-gray-600 text-white',
-    rightPanel: 'bg-gray-700 text-gray-100',
+    leftPanel: 'bg-gray-900 text-gray-100',
+    listItem: 'bg-gray-800 text-gray-100 hover:bg-gray-600 focus:outline-none',
+    listItemActive: 'bg-gray-700 text-white',
+    rightPanel: 'bg-gray-600 text-gray-100',
     border: 'border-gray-600'
   }
 };

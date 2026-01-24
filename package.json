@@ -16,7 +16,7 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.yourcompany.webprojector",
+    "appId": "com.daford.webprojector",
     "productName": "Web Projector",
     "asar": false,
     "files": [

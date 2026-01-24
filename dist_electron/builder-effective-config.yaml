@@ -1,0 +1,28 @@
+directories:
+  output: dist_electron
+  buildResources: assets
+appId: com.yourcompany.webprojector
+productName: Web Projector
+asar: false
+files:
+  - filter:
+      - dist/**
+      - electron/**
+      - public/**
+      - package.json
+extraResources:
+  - from: data
+    to: data
+    filter:
+      - '**/*'
+mac:
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+electronVersion: 34.5.8
