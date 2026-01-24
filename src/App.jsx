@@ -1474,80 +1474,88 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
           <h3 className="font-semibold mb-4">Text Display Settings</h3>
 
             <div className={`p-4 rounded border ${theme.border} mb-4`}>
-            <label className="block mb-2 text-sm">Font Family</label>
-            <select
-              value={fontFamily}
-              onChange={(e) => setFontFamily(e.target.value)}
-              className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-            >
-              {availableFonts && availableFonts.length > 0 ? (
-                availableFonts.map(f => (
-                  <option key={f.filename} value={f.family}>{f.family}</option>
-                ))
-              ) : (
-                <option value="" disabled>No fonts found in /fonts — add font files</option>
-              )}
-            </select>
-          </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block mb-2 text-sm">Font Family</label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                  >
+                    {availableFonts && availableFonts.length > 0 ? (
+                      availableFonts.map(f => (
+                        <option key={f.filename} value={f.family}>{f.family}</option>
+                      ))
+                    ) : (
+                      <option value="" disabled>No fonts found in /fonts — add font files</option>
+                    )}
+                  </select>
+                </div>
 
-          <div className={`p-4 rounded border ${theme.border} mb-4`}>
-            <label className="block mb-2 text-sm">Font Style</label>
-            <select
-              value={fontStyle}
-              onChange={(e) => setFontStyle(e.target.value)}
-              className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-            >
-              <option value="normal">Normal</option>
-              <option value="bold">Bold</option>
-              <option value="italic">Italic</option>
-              <option value="bold-italic">Bold Italic</option>
-            </select>
-          </div>
+                <div className="w-40 min-w-[120px]">
+                  <label className="block mb-2 text-sm">Font Style</label>
+                  <select
+                    value={fontStyle}
+                    onChange={(e) => setFontStyle(e.target.value)}
+                    className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                    <option value="bold-italic">Bold Italic</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           
           <div className="border-t pt-4 mt-4">
             <h3 className="font-semibold mb-4">UI Font Settings (menus, buttons, lists)</h3>
 
             <div className={`p-4 rounded border ${theme.border} mb-4`}>
-              <label className="block mb-2 text-sm">UI Font Family</label>
-              <select
-                value={uiFontFamily}
-                onChange={(e) => setUiFontFamily(e.target.value)}
-                className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-              >
-                {availableFonts && availableFonts.length > 0 ? (
-                  availableFonts.map(f => (
-                    <option key={f.filename} value={f.family}>{f.family}</option>
-                  ))
-                ) : (
-                  <option value="" disabled>No fonts found in /fonts — add font files</option>
-                )}
-              </select>
-            </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="block mb-2 text-sm">UI Font Family</label>
+                  <select
+                    value={uiFontFamily}
+                    onChange={(e) => setUiFontFamily(e.target.value)}
+                    className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                  >
+                    {availableFonts && availableFonts.length > 0 ? (
+                      availableFonts.map(f => (
+                        <option key={f.filename} value={f.family}>{f.family}</option>
+                      ))
+                    ) : (
+                      <option value="" disabled>No fonts found in /fonts — add font files</option>
+                    )}
+                  </select>
+                </div>
 
-            <div className={`p-4 rounded border ${theme.border} mb-4`}>
-              <label className="block mb-2 text-sm">UI Font Size (px)</label>
-              <input
-                type="number"
-                min={10}
-                max={36}
-                value={uiFontSize}
-                onChange={(e) => setUiFontSize(e.target.value)}
-                className={`w-32 p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-              />
-            </div>
+                <div className="w-32">
+                  <label className="block mb-2 text-sm">UI Font Size (px)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={36}
+                    value={uiFontSize}
+                    onChange={(e) => setUiFontSize(e.target.value)}
+                    className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                  />
+                </div>
 
-            <div className={`p-4 rounded border ${theme.border} mb-4`}>
-              <label className="block mb-2 text-sm">UI Font Style</label>
-              <select
-                value={uiFontStyle}
-                onChange={(e) => setUiFontStyle(e.target.value)}
-                className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
-              >
-                <option value="normal">Normal</option>
-                <option value="bold">Bold</option>
-                <option value="italic">Italic</option>
-                <option value="bold-italic">Bold Italic</option>
-              </select>
+                <div className="w-40 min-w-[120px]">
+                  <label className="block mb-2 text-sm">UI Font Style</label>
+                  <select
+                    value={uiFontStyle}
+                    onChange={(e) => setUiFontStyle(e.target.value)}
+                    className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="bold">Bold</option>
+                    <option value="italic">Italic</option>
+                    <option value="bold-italic">Bold Italic</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
