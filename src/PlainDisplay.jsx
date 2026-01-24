@@ -5,7 +5,7 @@ function PlainDisplay() {
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
-  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontFamily, setFontFamily] = useState('');
   const [fontStyle, setFontStyle] = useState('normal');
   const textRef = useRef(null);
   const containerRef = useRef(null);
@@ -58,7 +58,7 @@ function PlainDisplay() {
             case 'fullState':
               setSelectedLiveItem(data.data.selectedLiveItem || null);
               if (data.data.settings) {
-                setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+                setFontFamily(data.data.settings.fontFamily || '');
                 setFontStyle(data.data.settings.fontStyle || 'normal');
               }
               break;
@@ -67,7 +67,7 @@ function PlainDisplay() {
               break;
             case 'settings':
               if (data.data) {
-                setFontFamily(data.data.fontFamily || 'Arial Black');
+                setFontFamily(data.data.fontFamily || '');
                 setFontStyle(data.data.fontStyle || 'normal');
               }
               break;

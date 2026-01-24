@@ -182,7 +182,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               // Dark mode is saved in localStorage, not synced from server
               setters.setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
               setters.setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
-              setters.setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+              setters.setFontFamily(data.data.settings.fontFamily || '');
               setters.setFontStyle(data.data.settings.fontStyle || 'normal');
             }
             break;
@@ -206,7 +206,7 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               // Dark mode is saved in localStorage, not synced from server
               setters.setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
               setters.setLiveBackgroundImage(data.data.liveBackgroundImage || null);
-              setters.setFontFamily(data.data.fontFamily || 'Arial Black');
+              setters.setFontFamily(data.data.fontFamily || '');
               setters.setFontStyle(data.data.fontStyle || 'normal');
             }
             break;
@@ -673,7 +673,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = 'Arial Black', fontStyle = 'normal', uiFontFamily, uiFontSize, uiFontStyle }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = '', fontStyle = 'normal', uiFontFamily, uiFontSize, uiFontStyle }) {
   const [fontSize, setFontSize] = useState(40);
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
@@ -1378,7 +1378,7 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
   );
 }
 
-function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage, fontFamily, setFontFamily, fontStyle, setFontStyle, sendSettings, uiFontFamily, setUiFontFamily, uiFontSize, setUiFontSize, uiFontStyle, setUiFontStyle }) {
+function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage, fontFamily, setFontFamily, fontStyle, setFontStyle, sendSettings, uiFontFamily, setUiFontFamily, uiFontSize, setUiFontSize, uiFontStyle, setUiFontStyle, availableFonts }) {
   const [bkgimages, setBkgimages] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -1465,23 +1465,20 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
         <div className="border-t pt-4 mt-4">
           <h3 className="font-semibold mb-4">Text Display Settings</h3>
 
-          <div className={`p-4 rounded border ${theme.border} mb-4`}>
+            <div className={`p-4 rounded border ${theme.border} mb-4`}>
             <label className="block mb-2 text-sm">Font Family</label>
             <select
               value={fontFamily}
               onChange={(e) => setFontFamily(e.target.value)}
               className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
             >
-              <option value="Arial">Arial</option>
-              <option value="Arial Black">Arial Black</option>
-              <option value="Helvetica">Helvetica</option>
-              <option value="Times New Roman">Times New Roman</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Courier New">Courier New</option>
-              <option value="Verdana">Verdana</option>
-              <option value="Trebuchet MS">Trebuchet MS</option>
-              <option value="Impact">Impact</option>
-              <option value="Comic Sans MS">Comic Sans MS</option>
+              {availableFonts && availableFonts.length > 0 ? (
+                availableFonts.map(f => (
+                  <option key={f.filename} value={f.family}>{f.family}</option>
+                ))
+              ) : (
+                <option value="" disabled>No fonts found in /fonts — add font files</option>
+              )}
             </select>
           </div>
 
@@ -1509,17 +1506,13 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
                 onChange={(e) => setUiFontFamily(e.target.value)}
                 className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
               >
-                <option value="inherit">Default</option>
-                <option value="Arial">Arial</option>
-                <option value="Arial Black">Arial Black</option>
-                <option value="Helvetica">Helvetica</option>
-                <option value="Times New Roman">Times New Roman</option>
-                <option value="Georgia">Georgia</option>
-                <option value="Courier New">Courier New</option>
-                <option value="Verdana">Verdana</option>
-                <option value="Trebuchet MS">Trebuchet MS</option>
-                <option value="Impact">Impact</option>
-                <option value="Comic Sans MS">Comic Sans MS</option>
+                {availableFonts && availableFonts.length > 0 ? (
+                  availableFonts.map(f => (
+                    <option key={f.filename} value={f.family}>{f.family}</option>
+                  ))
+                ) : (
+                  <option value="" disabled>No fonts found in /fonts — add font files</option>
+                )}
               </select>
             </div>
 
@@ -1636,7 +1629,7 @@ export default function App() {
   const [chordsToggleSongs, setChordsToggleSongs] = useState(true);
   const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
   const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
-  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontFamily, setFontFamily] = useState('');
   const [fontStyle, setFontStyle] = useState('normal');
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
 
@@ -1650,6 +1643,59 @@ export default function App() {
   const [uiFontStyle, setUiFontStyle] = useState(() => {
     return localStorage.getItem('uiFontStyle') || 'normal';
   });
+
+  const [availableFonts, setAvailableFonts] = useState([]);
+
+  // Fetch available fonts from server on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/fonts');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!mounted) return;
+        setAvailableFonts(data || []);
+
+        // If no explicit fontFamily chosen yet and we have fonts, pick first available
+        if (!fontFamily && data && data.length > 0) {
+          setFontFamily(data[0].family);
+        }
+        if (!uiFontFamily && data && data.length > 0) {
+          setUiFontFamily(data[0].family);
+        }
+      } catch (err) {
+        console.error('Failed to fetch fonts:', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Inject @font-face rules for discovered fonts so browsers will load them
+  useEffect(() => {
+    if (!availableFonts || availableFonts.length === 0) return;
+
+    const existing = document.getElementById('discovered-fonts-css');
+    if (existing) existing.remove();
+
+    const style = document.createElement('style');
+    style.id = 'discovered-fonts-css';
+
+    const rules = availableFonts.map(f => {
+      const ext = f.filename.split('.').pop().toLowerCase();
+      let format = '';
+      if (ext === 'woff2') format = "format('woff2')";
+      else if (ext === 'woff') format = "format('woff')";
+      else if (ext === 'ttf') format = "format('truetype')";
+      else if (ext === 'otf') format = "format('opentype')";
+      else if (ext === 'eot') format = "";
+      const src = `url(${f.url}) ${format}`.trim();
+      return `@font-face { font-family: '${f.family}'; src: ${src}; font-display: swap; }`;
+    }).join('\n');
+
+    style.appendChild(document.createTextNode(rules));
+    document.head.appendChild(style);
+  }, [availableFonts]);
 
   // Persist UI font settings to localStorage (these are per-browser settings)
   useEffect(() => {
@@ -1968,6 +2014,7 @@ export default function App() {
           setUiFontSize={setUiFontSize}
           uiFontStyle={uiFontStyle}
           setUiFontStyle={setUiFontStyle}
+          availableFonts={availableFonts}
         />
       ) : (
         <div className={`flex h-[calc(100vh-60px)] overflow-hidden ${isPortrait ? 'flex-col' : 'flex-row'}`}>

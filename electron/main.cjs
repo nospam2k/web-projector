@@ -45,6 +45,12 @@ if (!fs.existsSync(imagesFolder)) {
   fs.mkdirSync(imagesFolder, { recursive: true });
 }
 
+// Setup fonts folder in data folder (served to clients)
+const fontsFolder = path.join(dataFolder, 'fonts');
+if (!fs.existsSync(fontsFolder)) {
+  fs.mkdirSync(fontsFolder, { recursive: true });
+}
+
 // Setup multer for image uploads
 const upload = multer({
   storage: multer.diskStorage({
@@ -183,7 +189,7 @@ function loadInitialState() {
       currentState.settings = {
         liveBackgroundColor: savedSettings.liveBackgroundColor ?? '#000000',
         liveBackgroundImage: savedSettings.liveBackgroundImage ?? null,
-        fontFamily: savedSettings.fontFamily ?? 'Arial Black',
+        fontFamily: savedSettings.fontFamily ?? '',
         fontStyle: savedSettings.fontStyle ?? 'normal' // 'normal', 'bold', 'italic', 'bold-italic'
       };
     }
@@ -219,6 +225,25 @@ async function startServer(port) {
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
       next();
+    });
+
+    // Serve fonts folder statically at /fonts
+    expressApp.use('/fonts', express.static(fontsFolder));
+
+    // Endpoint to list available fonts (scans fontsFolder)
+    expressApp.get('/api/fonts', (req, res) => {
+      try {
+        const files = fs.readdirSync(fontsFolder || '.');
+        const fontFiles = files.filter(f => /\.(ttf|otf|woff2?|eot)$/i.test(f));
+        const fonts = fontFiles.map(f => {
+          const family = path.parse(f).name; // infer family from filename
+          return { filename: f, family, url: `/fonts/${encodeURIComponent(f)}` };
+        });
+        res.json(fonts);
+      } catch (err) {
+        console.error('Error reading fonts folder:', err);
+        res.json([]);
+      }
     });
 
     // API endpoints for data operations

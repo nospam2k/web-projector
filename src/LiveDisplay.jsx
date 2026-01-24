@@ -7,7 +7,7 @@ function LiveDisplay() {
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
   const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
   const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
-  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontFamily, setFontFamily] = useState('');
   const [fontStyle, setFontStyle] = useState('normal');
   const textRef = useRef(null);
   const containerRef = useRef(null);
@@ -62,7 +62,7 @@ function LiveDisplay() {
               if (data.data.settings) {
                 setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
                 setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
-                setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+                setFontFamily(data.data.settings.fontFamily || '');
                 setFontStyle(data.data.settings.fontStyle || 'normal');
               }
               break;
@@ -73,7 +73,7 @@ function LiveDisplay() {
               if (data.data) {
                 setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
                 setLiveBackgroundImage(data.data.liveBackgroundImage || null);
-                setFontFamily(data.data.fontFamily || 'Arial Black');
+                setFontFamily(data.data.fontFamily || '');
                 setFontStyle(data.data.fontStyle || 'normal');
               }
               break;
