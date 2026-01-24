@@ -12,18 +12,38 @@
     "electron": "electron .",
     "electron:dev": "concurrently \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish never",
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
     "appId": "com.yourcompany.webprojector",
     "productName": "Web Projector",
+    "asar": false,
     "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "database.db"
+      "dist/**",
+      "electron/**",
+      "public/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["**/*"]
+      }
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "dist_electron"
+    },
+    "mac": {
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "linux": {
+      "target": ["AppImage"]
     }
   },
   "dependencies": {
