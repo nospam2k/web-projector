@@ -251,8 +251,54 @@ async function startServer(port) {
       res.json(currentState.songs);
     });
 
+    // Create new song
+    expressApp.post('/api/songs', (req, res) => {
+      try {
+        const { title, lyrics, chords } = req.body || {};
+        const stmt = db.prepare('INSERT INTO songs (title, lyrics, chords) VALUES (?, ?, ?)');
+        const info = stmt.run(title || 'Untitled', lyrics || '', chords || '');
+        const songStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
+        const song = songStmt.get(info.lastInsertRowid);
+
+        // Reload songs into current state
+        const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
+        currentState.songs = songsStmt.all();
+
+        // Broadcast to all clients
+        broadcastToAll({ type: 'songs', data: currentState.songs });
+
+        res.json(song);
+      } catch (err) {
+        console.error('Error creating song:', err);
+        res.status(500).json({ error: 'Failed to create song' });
+      }
+    });
+
     expressApp.get('/api/slides', (req, res) => {
       res.json(currentState.slides);
+    });
+
+    // Create new slide
+    expressApp.post('/api/slides', (req, res) => {
+      try {
+        const { title, content } = req.body || {};
+        const stmt = db.prepare('INSERT INTO slides (title, content) VALUES (?, ?)');
+        const info = stmt.run(title || 'Untitled', content || '');
+        const slideStmt = db.prepare('SELECT * FROM slides WHERE id = ?');
+        const slide = slideStmt.get(info.lastInsertRowid);
+
+        // Reload slides into current state
+        const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
+        currentState.slides = slidesStmt.all();
+
+        // Broadcast to all clients
+        broadcastToAll({ type: 'slides', data: currentState.slides });
+
+        res.json(slide);
+      } catch (err) {
+        console.error('Error creating slide:', err);
+        res.status(500).json({ error: 'Failed to create slide' });
+      }
     });
 
     expressApp.get('/api/playlist/:type', (req, res) => {
@@ -299,11 +345,11 @@ async function startServer(port) {
     // Update individual song
     expressApp.put('/api/songs/:id', (req, res) => {
       const id = parseInt(req.params.id);
-      const { title, lyrics } = req.body;
+      const { title, lyrics, chords } = req.body;
 
       try {
-        const stmt = db.prepare('UPDATE songs SET title = ?, lyrics = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
-        const result = stmt.run(title, lyrics, id);
+        const stmt = db.prepare('UPDATE songs SET title = ?, lyrics = ?, chords = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+        const result = stmt.run(title, lyrics, chords, id);
 
         if (result.changes === 0) {
           return res.status(404).json({ error: 'Song not found' });

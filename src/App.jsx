@@ -1157,7 +1157,12 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
   if (loading) {
     return (
       <div className={`${theme.leftPanel} p-8`}>
-        <h2 className="text-xl font-bold mb-4">Songs</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Songs</h2>
+          <button onClick={() => { setEditingId('new'); setEditingTitle(''); setEditingContent(''); setEditingChords(''); }} title="Add Song" aria-label="Add song" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+            Add Song
+          </button>
+        </div>
         <p className="text-gray-500">Loading songs...</p>
       </div>
     );
@@ -1165,7 +1170,68 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
 
   return (
     <div className={`${theme.leftPanel} p-8 overflow-auto`}>
-      <h2 className="text-xl font-bold mb-4">Songs</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Songs</h2>
+        <button onClick={() => { setEditingId('new'); setEditingTitle(''); setEditingContent(''); setEditingChords(''); }} title="Add Song" aria-label="Add song" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+          Add Song
+        </button>
+      </div>
+      {editingId === 'new' && (
+        <div className={`p-3 mb-4 rounded ${theme.listItem}`}>
+          <div className="flex-1 flex flex-col gap-3">
+            {(() => {
+              const inputClass = `w-full px-2 py-1 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+              const textareaClass = `w-full h-48 p-2 rounded border resize-vertical ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+              const saveBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`;
+              const cancelBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`;
+              return (
+                <>
+                  <input
+                    autoFocus
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className={inputClass}
+                    placeholder="Song title"
+                  />
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    className={textareaClass}
+                    placeholder="Song lyrics or content"
+                  />
+                  <textarea
+                    value={editingChords}
+                    onChange={(e) => setEditingChords(e.target.value)}
+                    className={textareaClass}
+                    placeholder="Chords"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button disabled={editingTitle.trim() === ''} onClick={async () => {
+                      // create new song
+                      const newTitle = editingTitle.trim();
+                      if (!newTitle) return;
+                      try {
+                        const resp = await fetch('/api/songs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle, lyrics: editingContent, chords: editingChords }) });
+                        const created = await resp.json();
+                        setSongs(prev => [...prev, created]);
+                        setSongItems(prev => prev); // keep playlists unchanged
+                      } catch (err) {
+                        console.error('Failed to create song:', err);
+                      }
+                      setEditingId(null);
+                      setEditingTitle('');
+                      setEditingContent('');
+                      setEditingChords('');
+                    }} className={`${saveBtn} ${editingTitle.trim() === '' ? 'opacity-50 cursor-not-allowed' : ''}`} aria-disabled={editingTitle.trim() === ''}>Save</button>
+                    <button onClick={() => { setEditingId(null); setEditingTitle(''); setEditingContent(''); setEditingChords(''); }} className={cancelBtn}>Cancel</button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {songs.length === 0 ? (
         <p className="text-gray-500">No songs found in database</p>
       ) : (
@@ -1305,7 +1371,12 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   if (loading) {
     return (
       <div className={`${theme.leftPanel} p-8`}>
-        <h2 className="text-xl font-bold mb-4">Slides</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Slides</h2>
+          <button onClick={() => { setEditingId('new'); setEditingTitle(''); setEditingContent(''); }} title="Add Slide" aria-label="Add slide" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+            Add Slide
+          </button>
+        </div>
         <p className="text-gray-500">Loading slides...</p>
       </div>
     );
@@ -1313,7 +1384,60 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
 
   return (
     <div className={`${theme.leftPanel} p-8 overflow-auto`}>
-      <h2 className="text-xl font-bold mb-4">Slides</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Slides</h2>
+        <button onClick={() => { setEditingId('new'); setEditingTitle(''); setEditingContent(''); }} title="Add Slide" aria-label="Add slide" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-green-500 text-white hover:bg-green-600'}`}>
+          Add Slide
+        </button>
+      </div>
+      {editingId === 'new' && (
+        <div className={`p-3 mb-4 rounded ${theme.listItem}`}>
+          <div className="flex-1 flex flex-col gap-3">
+            {(() => {
+              const inputClass = `w-full px-2 py-1 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+              const textareaClass = `w-full h-48 p-2 rounded border resize-vertical ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+              const saveBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`;
+              const cancelBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`;
+              return (
+                <>
+                  <input
+                    autoFocus
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className={inputClass}
+                    placeholder="Slide title"
+                  />
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    className={textareaClass}
+                    placeholder="Slide content"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button disabled={editingTitle.trim() === ''} onClick={async () => {
+                      const newTitle = editingTitle.trim();
+                      if (!newTitle) return;
+                      try {
+                        const resp = await fetch('/api/slides', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newTitle, content: editingContent }) });
+                        const created = await resp.json();
+                        setSlides(prev => [...prev, created]);
+                        setSlideItems(prev => prev);
+                      } catch (err) {
+                        console.error('Failed to create slide:', err);
+                      }
+                      setEditingId(null);
+                      setEditingTitle('');
+                      setEditingContent('');
+                    }} className={`${saveBtn} ${editingTitle.trim() === '' ? 'opacity-50 cursor-not-allowed' : ''}`} aria-disabled={editingTitle.trim() === ''}>Save</button>
+                    <button onClick={() => { setEditingId(null); setEditingTitle(''); setEditingContent(''); }} className={cancelBtn}>Cancel</button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {slides.length === 0 ? (
         <p className="text-gray-500">No slides found in database</p>
       ) : (
