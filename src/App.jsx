@@ -1080,6 +1080,7 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
+  const [editingChords, setEditingChords] = useState('');
 
   useEffect(() => {
     if (editingId === null) {
@@ -1092,28 +1093,31 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
     setEditingId(song.id);
     setEditingTitle(song.title || '');
     setEditingContent(song.lyrics ?? song.content ?? song.body ?? '');
+    setEditingChords(song.chords ?? '');
   };
 
   const cancelEditing = () => {
     setEditingId(null);
     setEditingTitle('');
     setEditingContent('');
+    setEditingChords('');
   };
 
   const saveEditing = async (id) => {
     const newTitle = editingTitle.trim();
     const newContent = editingContent;
+    const newChords = editingChords;
     if (!newTitle) return;
 
     // Optimistically update local state
-    setSongs(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent } : s)));
+    setSongs(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent, chords: newChords } : s)));
 
     try {
       // Save to database - the server will broadcast to other clients via WebSocket
       const response = await fetch(`/api/songs/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle, lyrics: newContent })
+        body: JSON.stringify({ title: newTitle, lyrics: newContent, chords: newChords })
       });
 
       const responseData = await response.json();
@@ -1147,6 +1151,7 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
     setEditingId(null);
     setEditingTitle('');
     setEditingContent('');
+    setEditingChords('');
   };
 
   if (loading) {
@@ -1188,6 +1193,12 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
                           onChange={(e) => setEditingContent(e.target.value)}
                           className={textareaClass}
                           placeholder="Song lyrics or content"
+                        />
+                        <textarea
+                          value={editingChords}
+                          onChange={(e) => setEditingChords(e.target.value)}
+                          className={textareaClass}
+                          placeholder="Chords"
                         />
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => saveEditing(song.id)} className={saveBtn}>Save</button>
