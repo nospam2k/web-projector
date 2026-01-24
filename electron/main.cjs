@@ -182,7 +182,9 @@ function loadInitialState() {
       const savedSettings = JSON.parse(settingsRow.value);
       currentState.settings = {
         liveBackgroundColor: savedSettings.liveBackgroundColor ?? '#000000',
-        liveBackgroundImage: savedSettings.liveBackgroundImage ?? null
+        liveBackgroundImage: savedSettings.liveBackgroundImage ?? null,
+        fontFamily: savedSettings.fontFamily ?? 'Arial Black',
+        fontStyle: savedSettings.fontStyle ?? 'normal' // 'normal', 'bold', 'italic', 'bold-italic'
       };
     }
   } catch (err) {
@@ -696,7 +698,9 @@ function handleClientMessage(data, ws) {
         // Update in-memory state (dark mode excluded)
         currentState.settings = {
           liveBackgroundColor: data.settings.liveBackgroundColor ?? currentState.settings.liveBackgroundColor,
-          liveBackgroundImage: data.settings.liveBackgroundImage ?? currentState.settings.liveBackgroundImage
+          liveBackgroundImage: data.settings.liveBackgroundImage ?? currentState.settings.liveBackgroundImage,
+          fontFamily: data.settings.fontFamily ?? currentState.settings.fontFamily,
+          fontStyle: data.settings.fontStyle ?? currentState.settings.fontStyle
         };
 
         // Save to database

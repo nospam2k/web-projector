@@ -7,9 +7,26 @@ function LiveDisplay() {
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
   const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
   const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
+  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontStyle, setFontStyle] = useState('normal');
   const textRef = useRef(null);
   const containerRef = useRef(null);
-  const fontFamily = 'Arial Black';
+
+  // Convert fontStyle prop to CSS properties
+  const getFontStyleProps = () => {
+    switch (fontStyle) {
+      case 'bold':
+        return { fontWeight: 'bold', fontStyle: 'normal' };
+      case 'italic':
+        return { fontWeight: 'normal', fontStyle: 'italic' };
+      case 'bold-italic':
+        return { fontWeight: 'bold', fontStyle: 'italic' };
+      default:
+        return { fontWeight: 'normal', fontStyle: 'normal' };
+    }
+  };
+
+  const fontStyleProps = getFontStyleProps();
 
   // WebSocket connection
   useEffect(() => {
@@ -45,6 +62,8 @@ function LiveDisplay() {
               if (data.data.settings) {
                 setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
                 setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
+                setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+                setFontStyle(data.data.settings.fontStyle || 'normal');
               }
               break;
             case 'selectedLiveItem':
@@ -54,6 +73,8 @@ function LiveDisplay() {
               if (data.data) {
                 setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
                 setLiveBackgroundImage(data.data.liveBackgroundImage || null);
+                setFontFamily(data.data.fontFamily || 'Arial Black');
+                setFontStyle(data.data.fontStyle || 'normal');
               }
               break;
           }
@@ -286,6 +307,7 @@ function LiveDisplay() {
                 style={{
                   fontSize: `${titleFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.1,
                   margin: 0,
                   whiteSpace: 'nowrap',
@@ -329,6 +351,7 @@ function LiveDisplay() {
                 style={{
                   fontSize: `${contentFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.2,
                   margin: 0,
                   whiteSpace: 'pre-wrap',
@@ -374,6 +397,7 @@ function LiveDisplay() {
           <pre style={{
             fontSize: `${fontSize}px`,
             fontFamily: fontFamily,
+            ...fontStyleProps,
             lineHeight: 1.2,
             margin: 0,
             whiteSpace: 'pre',

@@ -5,9 +5,26 @@ function PlainDisplay() {
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
+  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontStyle, setFontStyle] = useState('normal');
   const textRef = useRef(null);
   const containerRef = useRef(null);
-  const fontFamily = 'Arial Black';
+
+  // Convert fontStyle prop to CSS properties
+  const getFontStyleProps = () => {
+    switch (fontStyle) {
+      case 'bold':
+        return { fontWeight: 'bold', fontStyle: 'normal' };
+      case 'italic':
+        return { fontWeight: 'normal', fontStyle: 'italic' };
+      case 'bold-italic':
+        return { fontWeight: 'bold', fontStyle: 'italic' };
+      default:
+        return { fontWeight: 'normal', fontStyle: 'normal' };
+    }
+  };
+
+  const fontStyleProps = getFontStyleProps();
 
   // WebSocket connection
   useEffect(() => {
@@ -40,9 +57,19 @@ function PlainDisplay() {
           switch (data.type) {
             case 'fullState':
               setSelectedLiveItem(data.data.selectedLiveItem || null);
+              if (data.data.settings) {
+                setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+                setFontStyle(data.data.settings.fontStyle || 'normal');
+              }
               break;
             case 'selectedLiveItem':
               setSelectedLiveItem(data.data);
+              break;
+            case 'settings':
+              if (data.data) {
+                setFontFamily(data.data.fontFamily || 'Arial Black');
+                setFontStyle(data.data.fontStyle || 'normal');
+              }
               break;
           }
         } catch (err) {
@@ -271,6 +298,7 @@ function PlainDisplay() {
                 style={{
                   fontSize: `${titleFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.1,
                   margin: 0,
                   whiteSpace: 'nowrap',
@@ -314,6 +342,7 @@ function PlainDisplay() {
                 style={{
                   fontSize: `${contentFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.2,
                   margin: 0,
                   whiteSpace: 'pre-wrap',
@@ -359,6 +388,7 @@ function PlainDisplay() {
           <pre style={{
             fontSize: `${fontSize}px`,
             fontFamily: fontFamily,
+                  ...fontStyleProps,
             lineHeight: 1.2,
             margin: 0,
             whiteSpace: 'pre',

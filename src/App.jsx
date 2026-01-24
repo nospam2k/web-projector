@@ -108,7 +108,7 @@ function useDatabase() {
   return { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading };
 }
 
-function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem, setLiveBackgroundColor, setLiveBackgroundImage) {
+function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem, setLiveBackgroundColor, setLiveBackgroundImage, setFontFamily, setFontStyle) {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const mountedRef = useRef(true);
@@ -120,7 +120,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     setSlideItems,
     setSelectedLiveItem,
     setLiveBackgroundColor,
-    setLiveBackgroundImage
+    setLiveBackgroundImage,
+    setFontFamily,
+    setFontStyle
   });
 
   useEffect(() => {
@@ -131,7 +133,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
       setSlideItems,
       setSelectedLiveItem,
       setLiveBackgroundColor,
-      setLiveBackgroundImage
+      setLiveBackgroundImage,
+      setFontFamily,
+      setFontStyle
     };
   });
 
@@ -178,6 +182,8 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               // Dark mode is saved in localStorage, not synced from server
               setters.setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
               setters.setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
+              setters.setFontFamily(data.data.settings.fontFamily || 'Arial Black');
+              setters.setFontStyle(data.data.settings.fontStyle || 'normal');
             }
             break;
           case 'songs':
@@ -200,6 +206,8 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               // Dark mode is saved in localStorage, not synced from server
               setters.setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
               setters.setLiveBackgroundImage(data.data.liveBackgroundImage || null);
+              setters.setFontFamily(data.data.fontFamily || 'Arial Black');
+              setters.setFontStyle(data.data.fontStyle || 'normal');
             }
             break;
         }
@@ -640,14 +648,29 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = 'Arial Black', fontStyle = 'normal' }) {
   const [fontSize, setFontSize] = useState(40);
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
   const [isTextCleared, setIsTextCleared] = useState(false);
   const [isTextHidden, setIsTextHidden] = useState(false);
   const textRef = useRef(null);
-  const fontFamily = 'Arial Black';
+
+  // Convert fontStyle prop to CSS properties
+  const getFontStyleProps = () => {
+    switch (fontStyle) {
+      case 'bold':
+        return { fontWeight: 'bold', fontStyle: 'normal' };
+      case 'italic':
+        return { fontWeight: 'normal', fontStyle: 'italic' };
+      case 'bold-italic':
+        return { fontWeight: 'bold', fontStyle: 'italic' };
+      default:
+        return { fontWeight: 'normal', fontStyle: 'normal' };
+    }
+  };
+
+  const fontStyleProps = getFontStyleProps();
 
   const displayItem = selectedLiveItem || currentItems[0];
   const isSlide = !!displayItem?.slideData;
@@ -823,6 +846,7 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
                 style={{
                   fontSize: `${titleFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.1,
                   margin: 0,
                   whiteSpace: 'nowrap',
@@ -867,6 +891,7 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
                 style={{
                   fontSize: `${contentFontSize}px`,
                   fontFamily: fontFamily,
+                  ...fontStyleProps,
                   lineHeight: 1.2,
                   margin: 0,
                   whiteSpace: 'pre-wrap',
@@ -912,6 +937,7 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
           <pre style={{
             fontSize: `${fontSize}px`,
             fontFamily: fontFamily,
+            ...fontStyleProps,
             lineHeight: 1.2,
             margin: 0,
             whiteSpace: 'pre',
@@ -1298,11 +1324,11 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
-        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} />;
+        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} fontFamily={fontFamily} fontStyle={fontStyle} />;
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} selectedLiveItem={selectedLiveItem} />;
       case 'Songs':
@@ -1321,7 +1347,7 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
   );
 }
 
-function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage }) {
+function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage, fontFamily, setFontFamily, fontStyle, setFontStyle, sendSettings }) {
   const [bkgimages, setBkgimages] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -1406,8 +1432,46 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
         </div>
 
         <div className="border-t pt-4 mt-4">
+          <h3 className="font-semibold mb-4">Text Display Settings</h3>
+
+          <div className={`p-4 rounded border ${theme.border} mb-4`}>
+            <label className="block mb-2 text-sm">Font Family</label>
+            <select
+              value={fontFamily}
+              onChange={(e) => setFontFamily(e.target.value)}
+              className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+            >
+              <option value="Arial">Arial</option>
+              <option value="Arial Black">Arial Black</option>
+              <option value="Helvetica">Helvetica</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Verdana">Verdana</option>
+              <option value="Trebuchet MS">Trebuchet MS</option>
+              <option value="Impact">Impact</option>
+              <option value="Comic Sans MS">Comic Sans MS</option>
+            </select>
+          </div>
+
+          <div className={`p-4 rounded border ${theme.border} mb-4`}>
+            <label className="block mb-2 text-sm">Font Style</label>
+            <select
+              value={fontStyle}
+              onChange={(e) => setFontStyle(e.target.value)}
+              className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+            >
+              <option value="normal">Normal</option>
+              <option value="bold">Bold</option>
+              <option value="italic">Italic</option>
+              <option value="bold-italic">Bold Italic</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="border-t pt-4 mt-4">
           <h3 className="font-semibold mb-4">Live Display Background</h3>
-          
+
           <div className={`p-4 rounded border ${theme.border} mb-4`}>
             <label className="block mb-2 text-sm">Background Color</label>
             <div className="flex gap-2 items-center">
@@ -1490,6 +1554,8 @@ export default function App() {
   const [chordsToggleSongs, setChordsToggleSongs] = useState(true);
   const [liveBackgroundColor, setLiveBackgroundColor] = useState('#000000');
   const [liveBackgroundImage, setLiveBackgroundImage] = useState(null);
+  const [fontFamily, setFontFamily] = useState('Arial Black');
+  const [fontStyle, setFontStyle] = useState('normal');
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
 
   const menuBarRef = useRef(null);
@@ -1507,7 +1573,9 @@ export default function App() {
     slideItems, setSlideItems,
     setSelectedLiveItem,
     setLiveBackgroundColor,
-    setLiveBackgroundImage
+    setLiveBackgroundImage,
+    setFontFamily,
+    setFontStyle
   );
 
   const triggerRecalc = `${liveToggleSongs}-${chordsToggleSongs}-${songItems.length}-${slideItems.length}`;
@@ -1609,18 +1677,22 @@ export default function App() {
     // Check if any setting actually changed
     const hasChanged =
       settingsRef.current.liveBackgroundColor !== liveBackgroundColor ||
-      settingsRef.current.liveBackgroundImage !== liveBackgroundImage;
+      settingsRef.current.liveBackgroundImage !== liveBackgroundImage ||
+      settingsRef.current.fontFamily !== fontFamily ||
+      settingsRef.current.fontStyle !== fontStyle;
 
     if (!hasChanged) return;
 
-    settingsRef.current = { liveBackgroundColor, liveBackgroundImage };
+    settingsRef.current = { liveBackgroundColor, liveBackgroundImage, fontFamily, fontStyle };
 
     // Send to server (dark mode is NOT synced, it's per-device)
     sendSettings({
       liveBackgroundColor,
-      liveBackgroundImage
+      liveBackgroundImage,
+      fontFamily,
+      fontStyle
     });
-  }, [liveBackgroundColor, liveBackgroundImage, sendSettings]);
+  }, [liveBackgroundColor, liveBackgroundImage, fontFamily, fontStyle, sendSettings]);
 
   useEffect(() => {
     if (rightPanelRef.current && !isPortrait) {
@@ -1770,7 +1842,7 @@ export default function App() {
       />
 
       {activeButton === 'Settings' ? (
-        <SettingsPanel 
+        <SettingsPanel
           theme={currentTheme}
           isDarkMode={isDarkMode}
           toggleTheme={toggleTheme}
@@ -1778,6 +1850,11 @@ export default function App() {
           setLiveBackgroundColor={setLiveBackgroundColor}
           liveBackgroundImage={liveBackgroundImage}
           setLiveBackgroundImage={setLiveBackgroundImage}
+          fontFamily={fontFamily}
+          setFontFamily={setFontFamily}
+          fontStyle={fontStyle}
+          setFontStyle={setFontStyle}
+          sendSettings={sendSettings}
         />
       ) : (
         <div className={`flex h-[calc(100vh-60px)] overflow-hidden ${isPortrait ? 'flex-col' : 'flex-row'}`}>
@@ -1805,6 +1882,8 @@ export default function App() {
             currentItems={currentItems}
             liveBackgroundColor={liveBackgroundColor}
             liveBackgroundImage={liveBackgroundImage}
+            fontFamily={fontFamily}
+            fontStyle={fontStyle}
           />
 
           <RightPanel
