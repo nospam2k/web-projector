@@ -72,7 +72,11 @@ let currentState = {
   slides: [],
   songItems: [],
   slideItems: [],
-  selectedLiveItem: null
+  selectedLiveItem: null,
+  settings: {
+    liveBackgroundColor: '#000000',
+    liveBackgroundImage: null
+  }
 };
 
 // Load initial state
@@ -100,6 +104,20 @@ function loadInitialState() {
     console.error('Error loading selected live item:', err);
     currentState.selectedLiveItem = null;
   }
+
+  // Load app settings (background color/image - dark mode is per-device in localStorage)
+  try {
+    const settingsRow = settingsStmt.get('appSettings');
+    if (settingsRow) {
+      const savedSettings = JSON.parse(settingsRow.value);
+      currentState.settings = {
+        liveBackgroundColor: savedSettings.liveBackgroundColor ?? '#000000',
+        liveBackgroundImage: savedSettings.liveBackgroundImage ?? null
+      };
+    }
+  } catch (err) {
+    console.error('Error loading app settings:', err);
+  }
 }
 
 async function startServer(port) {
@@ -124,7 +142,10 @@ async function startServer(port) {
 
     // Disable caching for development so clients always fetch fresh assets
     expressApp.use((req, res, next) => {
-      res.setHeader('Cache-Control', 'no-store, must-revalidate');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
       next();
     });
 
@@ -268,6 +289,39 @@ async function startServer(port) {
       }
     });
 
+    // Get app settings (theme, background, etc.)
+    expressApp.get('/api/settings', (req, res) => {
+      res.json(currentState.settings);
+    });
+
+    // Update app settings (dark mode is NOT saved here, it's per-device in localStorage)
+    expressApp.put('/api/settings', (req, res) => {
+      try {
+        const newSettings = req.body;
+
+        // Update in-memory state (dark mode excluded)
+        currentState.settings = {
+          liveBackgroundColor: newSettings.liveBackgroundColor ?? currentState.settings.liveBackgroundColor,
+          liveBackgroundImage: newSettings.liveBackgroundImage ?? currentState.settings.liveBackgroundImage
+        };
+
+        // Save to database
+        const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        stmt.run('appSettings', JSON.stringify(currentState.settings));
+
+        // Broadcast to all clients
+        broadcastToAll({
+          type: 'settings',
+          data: currentState.settings
+        });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Error saving settings:', err);
+        res.status(500).json({ error: 'Failed to save settings' });
+      }
+    });
+
     // Test endpoint to verify API works
     expressApp.get('/api/test', (req, res) => {
       res.json({ status: 'ok', message: 'API server is working' });
@@ -335,8 +389,23 @@ async function startServer(port) {
     // Serve the React app build files or proxy to Vite in development
     const clientPath = path.join(__dirname, '../dist');
 
-    if (fs.existsSync(clientPath)) {
-      // Serve static build with no-cache headers
+    // In development mode, ALWAYS proxy to Vite (even if dist exists)
+    if (isDev && createProxyMiddleware) {
+      // In development, proxy requests to Vite dev server
+      console.log('[SERVER] Development mode: proxying to Vite on http://localhost:5173');
+      expressApp.use('/', createProxyMiddleware({
+        target: 'http://localhost:5173',
+        changeOrigin: true,
+        ws: false,  // Manual WebSocket handling below
+        onProxyRes: (proxyRes, req, res) => {
+          proxyRes.headers['cache-control'] = 'no-store, must-revalidate';
+          proxyRes.headers['pragma'] = 'no-cache';
+          proxyRes.headers['expires'] = '0';
+        }
+      }));
+    } else if (fs.existsSync(clientPath)) {
+      // Production mode: serve static build with no-cache headers
+      console.log('[SERVER] Production mode: serving static files from dist/');
       expressApp.use(express.static(clientPath, {
         setHeaders: (res, filePath) => {
           res.setHeader('Cache-Control', 'no-store, must-revalidate');
@@ -344,22 +413,12 @@ async function startServer(port) {
       }));
 
       // Fallback to serve index.html for client-side routing (must be after API routes)
-      expressApp.get('/', (req, res) => {
+      expressApp.get('*', (req, res) => {
         res.setHeader('Cache-Control', 'no-store, must-revalidate');
         res.sendFile(path.join(clientPath, 'index.html'));
       });
-    } else if (createProxyMiddleware && isDev) {
-      // In development, proxy requests to Vite dev server
-      expressApp.use('/', createProxyMiddleware({
-        target: 'http://localhost:5173',
-        changeOrigin: true,
-        ws: false,  // Manual WebSocket handling below
-        onProxyRes: (proxyRes, req, res) => {
-          proxyRes.headers['cache-control'] = 'no-store, must-revalidate';
-        }
-      }));
     } else {
-      // If no build exists and no proxy is available, serve a simple HTML page
+      // If no build exists and not in dev mode, serve error page
       expressApp.get('/', (req, res) => {
         res.setHeader('Cache-Control', 'no-store, must-revalidate');
         res.send('<html><body><h1>Client build not found</h1><p>Run: npm run build</p></body></html>');
@@ -489,6 +548,29 @@ function handleClientMessage(data, ws) {
       }
       break;
 
+    case 'updateSettings':
+      // Update app settings in database (dark mode is NOT saved, it's per-device in localStorage)
+      try {
+        // Update in-memory state (dark mode excluded)
+        currentState.settings = {
+          liveBackgroundColor: data.settings.liveBackgroundColor ?? currentState.settings.liveBackgroundColor,
+          liveBackgroundImage: data.settings.liveBackgroundImage ?? currentState.settings.liveBackgroundImage
+        };
+
+        // Save to database
+        const settingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        settingsStmt.run('appSettings', JSON.stringify(currentState.settings));
+
+        // Broadcast to all other clients (excluding sender)
+        broadcastToAllExcept(ws, {
+          type: 'settings',
+          data: currentState.settings
+        });
+      } catch (err) {
+        console.error('Error updating settings:', err);
+      }
+      break;
+
     case 'requestState':
       // Send current state to requesting client
       ws.send(JSON.stringify({
@@ -536,12 +618,14 @@ function createWindow() {
     },
   });
 
-  // Always load from localhost:5555
-  mainWindow.loadURL('http://localhost:5555');
-
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+  // In development, load from Vite dev server (5173), in production load from Express (5555)
   if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadURL('http://localhost:5555');
   }
 }
 

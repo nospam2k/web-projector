@@ -33,10 +33,22 @@ const MENU_ITEMS = ['Live', 'Chords', 'Songs', 'Slides', 'Settings'];
 // ============================================================================
 
 function useTheme() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Load dark mode from localStorage
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('isDarkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const currentTheme = isDarkMode ? THEMES.dark : THEMES.light;
+
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
-  return { isDarkMode, currentTheme, toggleTheme };
+
+  // Save to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
+  return { isDarkMode, setIsDarkMode, currentTheme, toggleTheme };
 }
 
 function useDatabase() {
@@ -96,7 +108,7 @@ function useDatabase() {
   return { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading };
 }
 
-function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem) {
+function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem, setLiveBackgroundColor, setLiveBackgroundImage) {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const mountedRef = useRef(true);
@@ -106,7 +118,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     setSlides,
     setSongItems,
     setSlideItems,
-    setSelectedLiveItem
+    setSelectedLiveItem,
+    setLiveBackgroundColor,
+    setLiveBackgroundImage
   });
 
   useEffect(() => {
@@ -115,7 +129,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
       setSlides,
       setSongItems,
       setSlideItems,
-      setSelectedLiveItem
+      setSelectedLiveItem,
+      setLiveBackgroundColor,
+      setLiveBackgroundImage
     };
   });
 
@@ -168,13 +184,19 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               slides: data.data.slides?.length,
               songItems: data.data.songItems?.length,
               slideItems: data.data.slideItems?.length,
-              selectedLiveItem: data.data.selectedLiveItem
+              selectedLiveItem: data.data.selectedLiveItem,
+              settings: data.data.settings
             });
             setters.setSongs(data.data.songs || []);
             setters.setSlides(data.data.slides || []);
             setters.setSongItems(data.data.songItems || []);
             setters.setSlideItems(data.data.slideItems || []);
             setters.setSelectedLiveItem(data.data.selectedLiveItem || null);
+            if (data.data.settings) {
+              // Dark mode is saved in localStorage, not synced from server
+              setters.setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
+              setters.setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
+            }
             break;
           case 'songs':
             setters.setSongs(data.data);
@@ -190,6 +212,13 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
             break;
           case 'selectedLiveItem':
             setters.setSelectedLiveItem(data.data);
+            break;
+          case 'settings':
+            if (data.data) {
+              // Dark mode is saved in localStorage, not synced from server
+              setters.setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
+              setters.setLiveBackgroundImage(data.data.liveBackgroundImage || null);
+            }
             break;
         }
       } catch (err) {
@@ -254,7 +283,16 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     }
   };
 
-  return { sendUpdate, sendSelectedLiveItem };
+  const sendSettings = (settings) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'updateSettings',
+        settings
+      }));
+    }
+  };
+
+  return { sendUpdate, sendSelectedLiveItem, sendSettings };
 }
 
 function useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc) {
@@ -911,14 +949,15 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
   );
 }
 
-function ChordsPanel({ theme, currentItems }) {
+function ChordsPanel({ theme, currentItems, selectedLiveItem }) {
   const [fontSize, setFontSize] = useState(16);
   const containerRef = useRef(null);
   const textRef = useRef(null);
   const fontFamily = 'Arial';
 
-  const currentItem = currentItems[0];
-  const content = currentItem?.songData?.chords || '';
+  // Use selectedLiveItem if available, otherwise fall back to first item in list
+  const displayItem = selectedLiveItem || currentItems[0];
+  const content = displayItem?.songData?.chords || '';
   const lines = content.split('\n');
 
   const isChordLine = (line) => {
@@ -969,7 +1008,7 @@ function ChordsPanel({ theme, currentItems }) {
     resizeText();
     window.addEventListener('resize', resizeText);
     return () => window.removeEventListener('resize', resizeText);
-  }, [lines, fontFamily, content, currentItems]);
+  }, [lines, fontFamily, content, selectedLiveItem]);
 
   return (
     <div ref={containerRef} className={`${theme.leftPanel} p-8 overflow-auto h-full`}>
@@ -1277,7 +1316,7 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
       case 'Live':
         return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} />;
       case 'Chords':
-        return <ChordsPanel theme={theme} currentItems={currentItems} />;
+        return <ChordsPanel theme={theme} currentItems={currentItems} selectedLiveItem={selectedLiveItem} />;
       case 'Songs':
         return <SongsPanel theme={theme} songs={songs} loading={loading} onAddSong={onAddSong} setSongs={setSongs} onSelectSong={onSelectSong} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} />;
       case 'Slides':
@@ -1469,11 +1508,19 @@ export default function App() {
   const controlButtonsRef = useRef(null);
   const rightPanelRef = useRef(null);
 
-  const { isDarkMode, currentTheme, toggleTheme } = useTheme();
+  const { isDarkMode, setIsDarkMode, currentTheme, toggleTheme } = useTheme();
   const { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading } = useDatabase();
 
   // WebSocket hook
-  const { sendUpdate, sendSelectedLiveItem } = useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem);
+  const { sendUpdate, sendSelectedLiveItem, sendSettings } = useWebSocket(
+    songs, setSongs,
+    slides, setSlides,
+    songItems, setSongItems,
+    slideItems, setSlideItems,
+    setSelectedLiveItem,
+    setLiveBackgroundColor,
+    setLiveBackgroundImage
+  );
 
   const triggerRecalc = `${liveToggleSongs}-${chordsToggleSongs}-${songItems.length}-${slideItems.length}`;
   const { isPortrait, leftPanelSize } = useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc);
@@ -1559,6 +1606,33 @@ export default function App() {
       setChordsToggleSongs(!isSlide);
     }
   }, [selectedLiveItem]);
+
+  // Save settings to database when they change (dark mode is saved in localStorage, not DB)
+  const settingsRef = useRef({ liveBackgroundColor, liveBackgroundImage });
+  const isFirstSettingsRender = useRef(true);
+  useEffect(() => {
+    // Skip first render to avoid saving initial values
+    if (isFirstSettingsRender.current) {
+      isFirstSettingsRender.current = false;
+      settingsRef.current = { liveBackgroundColor, liveBackgroundImage };
+      return;
+    }
+
+    // Check if any setting actually changed
+    const hasChanged =
+      settingsRef.current.liveBackgroundColor !== liveBackgroundColor ||
+      settingsRef.current.liveBackgroundImage !== liveBackgroundImage;
+
+    if (!hasChanged) return;
+
+    settingsRef.current = { liveBackgroundColor, liveBackgroundImage };
+
+    // Send to server (dark mode is NOT synced, it's per-device)
+    sendSettings({
+      liveBackgroundColor,
+      liveBackgroundImage
+    });
+  }, [liveBackgroundColor, liveBackgroundImage, sendSettings]);
 
   useEffect(() => {
     if (rightPanelRef.current && !isPortrait) {
