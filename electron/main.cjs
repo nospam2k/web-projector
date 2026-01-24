@@ -49,6 +49,14 @@ db.exec(`
   );
 `);
 
+// Ensure settings table exists for storing app state
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`);
+
 // ============================================================================
 // WEBSOCKET SERVER
 // ============================================================================
@@ -63,7 +71,8 @@ let currentState = {
   songs: [],
   slides: [],
   songItems: [],
-  slideItems: []
+  slideItems: [],
+  selectedLiveItem: null
 };
 
 // Load initial state
@@ -72,6 +81,7 @@ function loadInitialState() {
   const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
   const songPlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
   const slidePlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
+  const settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
 
   currentState.songs = songsStmt.all();
   currentState.slides = slidesStmt.all();
@@ -81,6 +91,15 @@ function loadInitialState() {
 
   currentState.songItems = songRow ? JSON.parse(songRow.data) : [];
   currentState.slideItems = slideRow ? JSON.parse(slideRow.data) : [];
+
+  // Load selected live item
+  try {
+    const selectedRow = settingsStmt.get('selectedLiveItem');
+    currentState.selectedLiveItem = selectedRow ? JSON.parse(selectedRow.value) : null;
+  } catch (err) {
+    console.error('Error loading selected live item:', err);
+    currentState.selectedLiveItem = null;
+  }
 }
 
 async function startServer(port) {
@@ -145,6 +164,108 @@ async function startServer(port) {
       });
 
       res.json({ success: true });
+    });
+
+    // Get individual song by ID
+    expressApp.get('/api/songs/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      const stmt = db.prepare('SELECT * FROM songs WHERE id = ?');
+      const song = stmt.get(id);
+      if (song) {
+        res.json(song);
+      } else {
+        res.status(404).json({ error: 'Song not found' });
+      }
+    });
+
+    // Update individual song
+    expressApp.put('/api/songs/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      const { title, lyrics } = req.body;
+
+      const stmt = db.prepare('UPDATE songs SET title = ?, lyrics = ? WHERE id = ?');
+      stmt.run(title, lyrics, id);
+
+      // Reload songs into current state
+      const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
+      currentState.songs = songsStmt.all();
+
+      // Broadcast to all clients
+      broadcastToAll({
+        type: 'songs',
+        data: currentState.songs
+      });
+
+      res.json({ success: true });
+    });
+
+    // Get individual slide by ID
+    expressApp.get('/api/slides/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      const stmt = db.prepare('SELECT * FROM slides WHERE id = ?');
+      const slide = stmt.get(id);
+      if (slide) {
+        res.json(slide);
+      } else {
+        res.status(404).json({ error: 'Slide not found' });
+      }
+    });
+
+    // Update individual slide
+    expressApp.put('/api/slides/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      const { title, content } = req.body;
+
+      const stmt = db.prepare('UPDATE slides SET title = ?, content = ? WHERE id = ?');
+      stmt.run(title, content, id);
+
+      // Reload slides into current state
+      const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
+      currentState.slides = slidesStmt.all();
+
+      // Broadcast to all clients
+      broadcastToAll({
+        type: 'slides',
+        data: currentState.slides
+      });
+
+      res.json({ success: true });
+    });
+
+    // Get selected live item
+    expressApp.get('/api/selected-live-item', (req, res) => {
+      try {
+        const stmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+        const row = stmt.get('selectedLiveItem');
+        if (row) {
+          res.json(JSON.parse(row.value));
+        } else {
+          res.json(null);
+        }
+      } catch (err) {
+        console.error('Error fetching selected live item:', err);
+        res.json(null);
+      }
+    });
+
+    // Set selected live item
+    expressApp.post('/api/selected-live-item', (req, res) => {
+      try {
+        const selectedItem = req.body;
+        const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        stmt.run('selectedLiveItem', JSON.stringify(selectedItem));
+
+        // Broadcast to all clients
+        broadcastToAll({
+          type: 'selectedLiveItem',
+          data: selectedItem
+        });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Error saving selected live item:', err);
+        res.status(500).json({ error: 'Failed to save selected live item' });
+      }
     });
 
     // Test endpoint to verify API works
@@ -334,21 +455,40 @@ function handleClientMessage(data, ws) {
       // Update playlist in database
       const stmt = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
       stmt.run(data.playlistType, JSON.stringify(data.items));
-      
+
       // Update state
       if (data.playlistType === 'songs') {
         currentState.songItems = data.items;
       } else {
         currentState.slideItems = data.items;
       }
-      
-      // Broadcast to all other clients
-      broadcastToAll({
+
+      // Broadcast to all other clients (excluding sender)
+      broadcastToAllExcept(ws, {
         type: data.playlistType === 'songs' ? 'songItems' : 'slideItems',
         data: data.items
       });
       break;
-      
+
+    case 'updateSelectedLiveItem':
+      // Update selected live item in database
+      try {
+        const settingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        settingsStmt.run('selectedLiveItem', JSON.stringify(data.selectedItem));
+
+        // Update state
+        currentState.selectedLiveItem = data.selectedItem;
+
+        // Broadcast to all other clients (excluding sender)
+        broadcastToAllExcept(ws, {
+          type: 'selectedLiveItem',
+          data: data.selectedItem
+        });
+      } catch (err) {
+        console.error('Error updating selected live item:', err);
+      }
+      break;
+
     case 'requestState':
       // Send current state to requesting client
       ws.send(JSON.stringify({
@@ -361,10 +501,21 @@ function handleClientMessage(data, ws) {
 
 function broadcastToAll(message) {
   if (!wss) return;
-  
+
   const messageStr = JSON.stringify(message);
   wss.clients.forEach(client => {
     if (client.readyState === 1) { // WebSocket.OPEN
+      client.send(messageStr);
+    }
+  });
+}
+
+function broadcastToAllExcept(excludeWs, message) {
+  if (!wss) return;
+
+  const messageStr = JSON.stringify(message);
+  wss.clients.forEach(client => {
+    if (client !== excludeWs && client.readyState === 1) { // WebSocket.OPEN
       client.send(messageStr);
     }
   });

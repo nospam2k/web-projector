@@ -96,7 +96,7 @@ function useDatabase() {
   return { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading };
 }
 
-function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems) {
+function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem) {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const mountedRef = useRef(true);
@@ -105,7 +105,8 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     setSongs,
     setSlides,
     setSongItems,
-    setSlideItems
+    setSlideItems,
+    setSelectedLiveItem
   });
 
   useEffect(() => {
@@ -113,7 +114,8 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
       setSongs,
       setSlides,
       setSongItems,
-      setSlideItems
+      setSlideItems,
+      setSelectedLiveItem
     };
   });
 
@@ -165,12 +167,14 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
               songs: data.data.songs?.length,
               slides: data.data.slides?.length,
               songItems: data.data.songItems?.length,
-              slideItems: data.data.slideItems?.length
+              slideItems: data.data.slideItems?.length,
+              selectedLiveItem: data.data.selectedLiveItem
             });
             setters.setSongs(data.data.songs || []);
             setters.setSlides(data.data.slides || []);
             setters.setSongItems(data.data.songItems || []);
             setters.setSlideItems(data.data.slideItems || []);
+            setters.setSelectedLiveItem(data.data.selectedLiveItem || null);
             break;
           case 'songs':
             setters.setSongs(data.data);
@@ -183,6 +187,9 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
             break;
           case 'slideItems':
             setters.setSlideItems(data.data);
+            break;
+          case 'selectedLiveItem':
+            setters.setSelectedLiveItem(data.data);
             break;
         }
       } catch (err) {
@@ -238,7 +245,16 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     }
   };
 
-  return { sendUpdate };
+  const sendSelectedLiveItem = (selectedItem) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'updateSelectedLiveItem',
+        selectedItem
+      }));
+    }
+  };
+
+  return { sendUpdate, sendSelectedLiveItem };
 }
 
 function useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc) {
@@ -512,8 +528,35 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
   );
 }
 
-function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle, onItemClick }) {
+function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle, onItemClick, selectedLiveItem, onDeleteItem }) {
   const [selectedItem, setSelectedItem] = useState(null);
+
+  // When the currently selected live item changes (e.g. from server),
+  // highlight the corresponding item in this panel and scroll it into view.
+  useEffect(() => {
+    if (!selectedLiveItem || !items || !rightPanelRef?.current) return;
+
+    // selectedLiveItem may be an object ({ id, songData/slideData }) or an id
+    const selId = typeof selectedLiveItem === 'object' ? selectedLiveItem.id : selectedLiveItem;
+    if (selId == null) return;
+
+    const matchIndex = items.findIndex(it => String(it.id) === String(selId));
+    if (matchIndex === -1) return;
+
+    const matched = items[matchIndex];
+    setSelectedItem(matched.id);
+
+    // Scroll the matched list item into view if possible
+    try {
+      const container = rightPanelRef.current;
+      const el = container.querySelector(`[data-item-index='${matchIndex}']`);
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [selectedLiveItem, items, rightPanelRef]);
 
   const handleItemClick = (item) => {
     if (!dragHandlers.isDragging) {
@@ -521,11 +564,6 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
       console.log(`Clicked: ${item.text}`);
       onItemClick?.(item);
     }
-  };
-
-  const handleDeleteItem = (index) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
   };
 
   return (
@@ -563,16 +601,16 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
                 position: 'relative'
               }}
               className={`p-3 rounded whitespace-nowrap flex items-center justify-between gap-3 ${
-                dragHandlers.draggedItem === index ? 'opacity-80 shadow-lg' : ''
-              } ${
-                selectedItem === item.id ? theme.menuButtonActive : theme.menuButton
-              }`}
+                  dragHandlers.draggedItem === index ? 'opacity-80 shadow-lg' : ''
+                } ${
+                  selectedItem === item.id ? theme.menuButtonActive : theme.menuButton
+                }`}
             >
               <span className="cursor-pointer flex-1" onClick={() => handleItemClick(item)}>
                 {item.text}
               </span>
               <button
-                onClick={() => handleDeleteItem(index)}
+                onClick={() => onDeleteItem?.(index)}
                 className="flex-shrink-0 p-1 rounded bg-red-500 hover:bg-red-700 text-white transition-colors"
                 title="Delete item"
               >
@@ -1001,22 +1039,21 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
     } catch (err) {
       console.error('Failed to save song:', err);
     }
-
+    // Re-fetch saved song from DB to ensure canonical data, and update live if this was selected
     try {
-      const sel = selectedLiveItem;
-      if (sel) {
-        const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
-        if (selId === id) {
-          if (sel.songData) {
-            setSelectedLiveItem({ ...sel, songData: { ...sel.songData, title: newTitle, lyrics: newContent } });
-          } else {
-            const updated = updatedSongs.find(s => s.id === id) || { id, title: newTitle, lyrics: newContent };
-            setSelectedLiveItem(updated);
+      const res = await fetch(`/api/songs/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const sel = selectedLiveItem;
+        if (sel) {
+          const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
+          if (selId === id) {
+            setSelectedLiveItem({ songData: data, id: data.id });
           }
         }
       }
     } catch (err) {
-      console.error('Failed to update selectedLiveItem after save:', err);
+      console.error('Failed to re-fetch song after save:', err);
     }
 
     setEditingId(null);
@@ -1143,22 +1180,21 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
     } catch (err) {
       console.error('Failed to save slide:', err);
     }
-
+    // Re-fetch saved slide from DB to ensure canonical data, and update live if this was selected
     try {
-      const sel = selectedLiveItem;
-      if (sel) {
-        const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
-        if (selId === id) {
-          if (sel.slideData) {
-            setSelectedLiveItem({ ...sel, slideData: { ...sel.slideData, title: newTitle, content: newContent } });
-          } else {
-            const updated = updatedSlides.find(s => s.id === id) || { id, title: newTitle, content: newContent };
-            setSelectedLiveItem(updated);
+      const res = await fetch(`/api/slides/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const sel = selectedLiveItem;
+        if (sel) {
+          const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
+          if (selId === id) {
+            setSelectedLiveItem({ slideData: data, id: data.id });
           }
         }
       }
     } catch (err) {
-      console.error('Failed to update selectedLiveItem after slide save:', err);
+      console.error('Failed to re-fetch slide after save:', err);
     }
 
     setEditingId(null);
@@ -1437,11 +1473,92 @@ export default function App() {
   const { songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, loading } = useDatabase();
 
   // WebSocket hook
-  const { sendUpdate } = useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems);
+  const { sendUpdate, sendSelectedLiveItem } = useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItems, slideItems, setSlideItems, setSelectedLiveItem);
 
   const triggerRecalc = `${liveToggleSongs}-${chordsToggleSongs}-${songItems.length}-${slideItems.length}`;
   const { isPortrait, leftPanelSize } = useLayout(menuBarRef, controlButtonsRef, rightPanelRef, triggerRecalc);
 
+  // Initialize selectedLiveItem when data first loads (only if not already set from server)
+  const hasInitialized = useRef(false);
+  useEffect(() => {
+    // Only run once when data first arrives
+    if (hasInitialized.current) return;
+    if (selectedLiveItem !== null) {
+      hasInitialized.current = true;
+      return; // Already initialized from server
+    }
+    if (songItems.length === 0 && slideItems.length === 0) return; // No data yet
+
+    hasInitialized.current = true;
+
+    // Determine which items to use based on current view
+    let itemsToCheck = [];
+    let isSlideList = false;
+
+    if (activeButton === 'Live') {
+      itemsToCheck = liveToggleSongs ? songItems : slideItems;
+      isSlideList = !liveToggleSongs;
+    } else if (activeButton === 'Chords') {
+      itemsToCheck = chordsToggleSongs ? songItems : slideItems;
+      isSlideList = !chordsToggleSongs;
+    } else if (activeButton === 'Songs') {
+      itemsToCheck = songItems;
+      isSlideList = false;
+    } else if (activeButton === 'Slides') {
+      itemsToCheck = slideItems;
+      isSlideList = true;
+    }
+
+    // If there are items, select the first one
+    if (itemsToCheck.length > 0) {
+      const firstItem = itemsToCheck[0];
+      setSelectedLiveItem(firstItem);
+
+      // Ensure the right panel toggle matches the type of item
+      if (activeButton === 'Live') {
+        setLiveToggleSongs(!isSlideList);
+      } else if (activeButton === 'Chords') {
+        setChordsToggleSongs(!isSlideList);
+      }
+    }
+  }, [songItems, slideItems]);
+
+  // Save selectedLiveItem to database whenever it changes
+  const selectedLiveItemIdRef = useRef(null);
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    // Skip the first render to avoid saving the initial null value
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      selectedLiveItemIdRef.current = selectedLiveItem?.id || null;
+      return;
+    }
+
+    const currentId = selectedLiveItem?.id || null;
+
+    // Skip if the ID hasn't actually changed (comparing IDs instead of object references)
+    if (selectedLiveItemIdRef.current === currentId) {
+      return;
+    }
+    selectedLiveItemIdRef.current = currentId;
+
+    if (selectedLiveItem !== null) {
+      sendSelectedLiveItem(selectedLiveItem);
+    }
+  }, [selectedLiveItem, sendSelectedLiveItem]);
+
+  // When selectedLiveItem loads from database, ensure the correct toggle is set
+  useEffect(() => {
+    if (!selectedLiveItem) return;
+
+    const isSlide = !!selectedLiveItem.slideData;
+
+    if (activeButton === 'Live') {
+      setLiveToggleSongs(!isSlide);
+    } else if (activeButton === 'Chords') {
+      setChordsToggleSongs(!isSlide);
+    }
+  }, [selectedLiveItem]);
 
   useEffect(() => {
     if (rightPanelRef.current && !isPortrait) {
@@ -1498,11 +1615,36 @@ export default function App() {
     return setCurrentItems;
   };
 
-  const handleDragEnd = (finalItems) => {
-    sendUpdate('updatePlaylist', currentPlaylistType, finalItems);
+  const getCurrentPlaylistType = () => {
+    if (activeButton === 'Songs') return 'songs';
+    if (activeButton === 'Slides') return 'slides';
+    if (activeButton === 'Live') {
+      return liveToggleSongs ? 'songs' : 'slides';
+    }
+    if (activeButton === 'Chords') {
+      return chordsToggleSongs ? 'songs' : 'slides';
+    }
+    return 'songs';
   };
 
-  const dragHandlers = useDragAndDrop(currentItems, setCurrentItems, handleDragEnd);
+  const handleDragEnd = (finalItems) => {
+    const playlistType = getCurrentPlaylistType();
+    sendUpdate('updatePlaylist', playlistType, finalItems);
+  };
+
+  const handleDeleteFromPlaylist = (index) => {
+    const items = getRightPanelItems();
+    const setItems = getRightPanelSetItems();
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+
+    const playlistType = getCurrentPlaylistType();
+    sendUpdate('updatePlaylist', playlistType, newItems);
+  };
+
+  const rightPanelItems = getRightPanelItems();
+  const rightPanelSetItems = getRightPanelSetItems();
+  const dragHandlers = useDragAndDrop(rightPanelItems, rightPanelSetItems, handleDragEnd);
 
   const handleButtonClick = (buttonName) => {
     setActiveButton(buttonName);
@@ -1523,6 +1665,38 @@ export default function App() {
       sendUpdate('updatePlaylist', 'slides', updated);
       return updated;
     });
+  };
+
+  // When a song/slide is selected from the left panel, fetch latest from DB and set as live item
+  const handleSelectSong = async (song) => {
+    if (!song || !song.id) return;
+    try {
+      const res = await fetch(`/api/songs/${song.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedLiveItem({ songData: data, id: data.id });
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to fetch song from DB:', err);
+    }
+    // Fallback to using provided object
+    setSelectedLiveItem({ songData: song, id: song.id });
+  };
+
+  const handleSelectSlide = async (slide) => {
+    if (!slide || !slide.id) return;
+    try {
+      const res = await fetch(`/api/slides/${slide.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedLiveItem({ slideData: data, id: data.id });
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to fetch slide from DB:', err);
+    }
+    setSelectedLiveItem({ slideData: slide, id: slide.id });
   };
 
   return (
@@ -1559,8 +1733,8 @@ export default function App() {
             loading={loading}
             onAddSong={handleAddSong}
             onAddSlide={handleAddSlide}
-            onSelectSong={setSelectedLiveItem}
-            onSelectSlide={setSelectedLiveItem}
+            onSelectSong={handleSelectSong}
+            onSelectSlide={handleSelectSlide}
             isDarkMode={isDarkMode}
             sendUpdate={sendUpdate}
             selectedLiveItem={selectedLiveItem}
@@ -1573,8 +1747,8 @@ export default function App() {
 
           <RightPanel
             key={triggerRecalc}
-            items={getRightPanelItems()}
-            setItems={getRightPanelSetItems()}
+            items={rightPanelItems}
+            setItems={rightPanelSetItems}
             theme={currentTheme}
             isPortrait={isPortrait}
             rightPanelRef={rightPanelRef}
@@ -1591,6 +1765,8 @@ export default function App() {
               }
             }}
             onItemClick={setSelectedLiveItem}
+            selectedLiveItem={selectedLiveItem}
+            onDeleteItem={handleDeleteFromPlaylist}
           />
         </div>
       )}
