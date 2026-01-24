@@ -142,7 +142,6 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     try {
       const testRes = await fetch('/api/test');
       const testData = await testRes.json();
-      console.log('[CLIENT] API test:', testData);
     } catch (err) {
       console.error('[CLIENT] API test failed:', err);
     }
@@ -150,43 +149,26 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const wsUrl = `${protocol}//${host}/ws`;
-    console.log('[CLIENT] Attempting WebSocket connection');
-    console.log('[CLIENT] Protocol:', protocol);
-    console.log('[CLIENT] Host:', host);
-    console.log('[CLIENT] Full URL:', wsUrl);
-    console.log('[CLIENT] Current page location:', window.location.href);
 
     let websocket;
     try {
       websocket = new WebSocket(wsUrl);
-      console.log('[CLIENT] WebSocket object created, readyState:', websocket.readyState);
     } catch (err) {
       console.error('[CLIENT] Failed to create WebSocket:', err);
       return;
     }
 
     websocket.onopen = () => {
-      console.log('[CLIENT] WebSocket OPENED, readyState:', websocket.readyState);
     };
 
     websocket.onmessage = (event) => {
       try {
-        console.log('WebSocket message received, size:', event.data.length, 'bytes');
         const data = JSON.parse(event.data);
-        console.log('WebSocket received:', data.type);
 
         const setters = settersRef.current;
 
         switch (data.type) {
           case 'fullState':
-            console.log('Setting full state:', {
-              songs: data.data.songs?.length,
-              slides: data.data.slides?.length,
-              songItems: data.data.songItems?.length,
-              slideItems: data.data.slideItems?.length,
-              selectedLiveItem: data.data.selectedLiveItem,
-              settings: data.data.settings
-            });
             setters.setSongs(data.data.songs || []);
             setters.setSlides(data.data.slides || []);
             setters.setSongItems(data.data.songItems || []);
@@ -227,14 +209,8 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
     };
 
     websocket.onclose = (event) => {
-      console.log('[CLIENT] WebSocket CLOSED');
-      console.log('[CLIENT] Close code:', event.code);
-      console.log('[CLIENT] Close reason:', event.reason);
-      console.log('[CLIENT] Was clean:', event.wasClean);
-      console.log('[CLIENT] ReadyState:', websocket.readyState);
       // Only reconnect on abnormal closure (not user-initiated)
       if (mountedRef.current && event.code !== 1000 && event.code !== 1001) {
-        console.log('[CLIENT] Reconnecting in 2s...');
         reconnectTimeoutRef.current = setTimeout(() => {
           connect.current();
         }, 2000);
@@ -599,7 +575,6 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   const handleItemClick = (item) => {
     if (!dragHandlers.isDragging) {
       setSelectedItem(item.id);
-      console.log(`Clicked: ${item.text}`);
       onItemClick?.(item);
     }
   };
@@ -1068,23 +1043,18 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
     const newContent = editingContent;
     if (!newTitle) return;
 
-    console.log('[SongsPanel] Saving song:', { id, title: newTitle, lyrics: newContent?.substring(0, 50) + '...' });
-
     // Optimistically update local state
     setSongs(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent } : s)));
 
     try {
       // Save to database - the server will broadcast to other clients via WebSocket
-      console.log('[SongsPanel] Calling PUT /api/songs/' + id);
       const response = await fetch(`/api/songs/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle, lyrics: newContent })
       });
 
-      console.log('[SongsPanel] PUT response status:', response.status);
       const responseData = await response.json();
-      console.log('[SongsPanel] PUT response data:', responseData);
 
       // Re-fetch saved song from DB to ensure canonical data
       const res = await fetch(`/api/songs/${id}`);
@@ -1215,23 +1185,18 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
     const newContent = editingContent;
     if (!newTitle) return;
 
-    console.log('[SlidesPanel] Saving slide:', { id, title: newTitle, content: newContent?.substring(0, 50) + '...' });
-
     // Optimistically update local state
     setSlides(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, content: newContent } : s)));
 
     try {
       // Save to database - the server will broadcast to other clients via WebSocket
-      console.log('[SlidesPanel] Calling PUT /api/slides/' + id);
       const response = await fetch(`/api/slides/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle, content: newContent })
       });
 
-      console.log('[SlidesPanel] PUT response status:', response.status);
       const responseData = await response.json();
-      console.log('[SlidesPanel] PUT response data:', responseData);
 
       // Re-fetch saved slide from DB to ensure canonical data
       const res = await fetch(`/api/slides/${id}`);
@@ -1357,24 +1322,24 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
 }
 
 function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage }) {
-  const [thumbnails, setThumbnails] = useState([]);
+  const [bkgimages, setBkgimages] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchThumbnails();
+    fetchBkgimages();
   }, []);
 
-  const fetchThumbnails = async () => {
+  const fetchBkgimages = async () => {
     try {
-      const response = await fetch('/api/thumbnails');
+      const response = await fetch('/api/bkgimages');
       const data = await response.json();
-      setThumbnails(data);
+      setBkgimages(data);
     } catch (err) {
-      console.error('Failed to fetch thumbnails:', err);
+      console.error('Failed to fetch background images:', err);
     }
   };
 
-  const handleThumbnailUpload = async (event) => {
+  const handleBkgimageUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -1383,32 +1348,32 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/thumbnails/upload', {
+      const response = await fetch('/api/bkgimages/upload', {
         method: 'POST',
         body: formData
       });
       const data = await response.json();
       if (data.success) {
-        fetchThumbnails();
+        fetchBkgimages();
       }
     } catch (err) {
-      console.error('Failed to upload thumbnail:', err);
+      console.error('Failed to upload background image:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleThumbnailSelect = (thumbnailPath) => {
-    setLiveBackgroundImage(thumbnailPath);
+  const handleBkgimageSelect = (bkgimagePath) => {
+    setLiveBackgroundImage(bkgimagePath);
   };
 
-  const handleThumbnailDelete = async (filename) => {
-    if (!window.confirm(`Delete thumbnail "${filename}"?`)) {
+  const handleBkgimageDelete = async (filename) => {
+    if (!window.confirm(`Delete background image "${filename}"?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/thumbnails/${filename}`, {
+      const response = await fetch(`/api/bkgimages/${filename}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -1416,10 +1381,10 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
         if (liveBackgroundImage?.includes(filename)) {
           setLiveBackgroundImage(null);
         }
-        fetchThumbnails();
+        fetchBkgimages();
       }
     } catch (err) {
-      console.error('Failed to delete thumbnail:', err);
+      console.error('Failed to delete background image:', err);
     }
   };
 
@@ -1461,7 +1426,7 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
             <input
               type="file"
               accept="image/jpeg,image/jpg"
-              onChange={handleThumbnailUpload}
+              onChange={handleBkgimageUpload}
               disabled={loading}
               className="block w-full text-sm"
             />
@@ -1469,24 +1434,24 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
           </div>
 
           <div className={`p-4 rounded border ${theme.border}`}>
-            {thumbnails.length === 0 ? (
-              <p className="text-xs text-gray-500">No thumbnails saved yet</p>
+            {bkgimages.length === 0 ? (
+              <p className="text-xs text-gray-500">No background images saved yet</p>
             ) : (
               <div className="grid grid-cols-9 gap-2">
-                {thumbnails.map((thumb) => (
-                  <div key={thumb.filename} className="relative group">
+                {bkgimages.map((bkgimg) => (
+                  <div key={bkgimg.filename} className="relative group">
                     <div
-                      onClick={() => handleThumbnailSelect(thumb.path)}
+                      onClick={() => handleBkgimageSelect(bkgimg.path)}
                       className={`cursor-pointer overflow-hidden rounded transition-all hover:opacity-75 border-2 ${
-                        liveBackgroundImage?.includes(thumb.filename)
+                        liveBackgroundImage?.includes(bkgimg.filename)
                           ? 'border-blue-500'
                           : isDarkMode ? 'border-gray-600' : 'border-gray-300'
                       }`}
                       style={{ paddingBottom: '56.25%', position: 'relative' }}
                     >
                       <img
-                        src={thumb.path}
-                        alt="thumbnail"
+                        src={bkgimg.path}
+                        alt="background image"
                         style={{
                           position: 'absolute',
                           top: 0,
@@ -1498,9 +1463,9 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
                       />
                     </div>
                     <button
-                      onClick={() => handleThumbnailDelete(thumb.filename)}
+                      onClick={() => handleBkgimageDelete(bkgimg.filename)}
                       className="absolute top-1 right-1 bg-red-500 hover:bg-red-700 text-white rounded-full p-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Delete thumbnail"
+                      title="Delete background image"
                     >
                       ✕
                     </button>
@@ -1745,7 +1710,6 @@ export default function App() {
 
   const handleButtonClick = (buttonName) => {
     setActiveButton(buttonName);
-    console.log(`${buttonName} clicked`);
   };
 
   const handleAddSong = (song) => {

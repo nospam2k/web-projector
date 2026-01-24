@@ -15,21 +15,21 @@ const httpProxy = require('http-proxy');
 const dbPath = path.join(__dirname, '../web-projector.db');
 const db = new Database(dbPath);
 
-// Setup thumbnails folder
-const thumbnailsFolder = path.join(app.getPath('userData'), 'thumbnails');
-if (!fs.existsSync(thumbnailsFolder)) {
-  fs.mkdirSync(thumbnailsFolder, { recursive: true });
+// Setup images folder - relative to app directory
+const imagesFolder = path.join(__dirname, '../images');
+if (!fs.existsSync(imagesFolder)) {
+  fs.mkdirSync(imagesFolder, { recursive: true });
 }
 
-// Setup multer for thumbnail uploads
+// Setup multer for image uploads
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, thumbnailsFolder);
+      cb(null, imagesFolder);
     },
     filename: (req, file, cb) => {
       const timestamp = Date.now();
-      cb(null, `thumbnail-${timestamp}.jpg`);
+      cb(null, `image-${timestamp}.jpg`);
     }
   }),
   fileFilter: (req, file, cb) => {
@@ -431,62 +431,62 @@ async function startServer(port) {
       res.json({ status: 'ok', message: 'API server is working' });
     });
 
-    // Thumbnail endpoints
-    expressApp.post('/api/thumbnails/upload', upload.single('file'), (req, res) => {
+    // Background image endpoints
+    expressApp.post('/api/bkgimages/upload', upload.single('file'), (req, res) => {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         filename: req.file.filename,
-        path: `/api/thumbnails/${req.file.filename}`
+        path: `/api/bkgimages/${req.file.filename}`
       });
     });
 
-    expressApp.get('/api/thumbnails', (req, res) => {
+    expressApp.get('/api/bkgimages', (req, res) => {
       try {
-        const files = fs.readdirSync(thumbnailsFolder)
-          .filter(file => file.startsWith('thumbnail-') && file.endsWith('.jpg'))
+        const files = fs.readdirSync(imagesFolder)
+          .filter(file => file.startsWith('image-') && file.endsWith('.jpg'))
           .map(file => ({
             filename: file,
-            path: `/api/thumbnails/${file}`,
-            created: fs.statSync(path.join(thumbnailsFolder, file)).birthtime
+            path: `/api/bkgimages/${file}`,
+            created: fs.statSync(path.join(imagesFolder, file)).birthtime
           }))
           .sort((a, b) => b.created - a.created);
         res.json(files);
       } catch (err) {
-        res.status(500).json({ error: 'Failed to read thumbnails' });
+        res.status(500).json({ error: 'Failed to read background images' });
       }
     });
 
-    expressApp.get('/api/thumbnails/:filename', (req, res) => {
+    expressApp.get('/api/bkgimages/:filename', (req, res) => {
       const filename = req.params.filename;
       // Validate filename to prevent directory traversal
       if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
         return res.status(400).json({ error: 'Invalid filename' });
       }
-      const filePath = path.join(thumbnailsFolder, filename);
+      const filePath = path.join(imagesFolder, filename);
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Thumbnail not found' });
+        return res.status(404).json({ error: 'Background image not found' });
       }
       res.sendFile(filePath);
     });
 
-    expressApp.delete('/api/thumbnails/:filename', (req, res) => {
+    expressApp.delete('/api/bkgimages/:filename', (req, res) => {
       const filename = req.params.filename;
       // Validate filename to prevent directory traversal
       if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
         return res.status(400).json({ error: 'Invalid filename' });
       }
-      const filePath = path.join(thumbnailsFolder, filename);
+      const filePath = path.join(imagesFolder, filename);
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Thumbnail not found' });
+        return res.status(404).json({ error: 'Background image not found' });
       }
       try {
         fs.unlinkSync(filePath);
         res.json({ success: true });
       } catch (err) {
-        res.status(500).json({ error: 'Failed to delete thumbnail' });
+        res.status(500).json({ error: 'Failed to delete background image' });
       }
     });
 
