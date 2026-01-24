@@ -678,7 +678,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
   const isSlide = !!displayItem?.slideData;
   const content = displayItem?.songData?.lyrics || displayItem?.slideData?.content || '';
   const slideTitle = displayItem?.slideData?.title || '';
-  const lines = content.split('\n').filter(line => line.trim());
+  // Don't filter out empty lines - they still take up space in the display
+  const lines = content.split('\n');
   const titleLines = slideTitle.split('\n').filter(line => line.trim());
 
   const backgroundStyle = {
@@ -706,16 +707,21 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
     while (size > 10) {
       ctx.font = `${size}px ${fontFamily}`;
 
-      const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+      // Measure the widest line (handle empty lines)
+      const lineWidths = lines.map(line => line.trim() ? ctx.measureText(line).width : 0);
+      const maxLineWidth = lineWidths.length > 0 ? Math.max(...lineWidths) : 0;
       const totalHeight = lines.length * size * 1.2;
 
-      if (maxLineWidth <= containerWidth * 0.9 && totalHeight <= containerHeight * 0.9) {
+      // Use tighter constraints (85% instead of 90%) to ensure text fits with margin
+      if (maxLineWidth <= containerWidth * 0.85 && totalHeight <= containerHeight * 0.85) {
         setFontSize(size);
         return;
       }
       size -= 2;
     }
-  }, [leftPanelSize, lines, fontFamily, content, currentItems, isSlide]);
+    // If no size fits, set minimum
+    setFontSize(10);
+  }, [leftPanelSize, lines, fontFamily, content, selectedLiveItem, isSlide]);
 
   // Font calculation for slides (title + content layout)
   useEffect(() => {
@@ -749,8 +755,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
       // Account for descenders - use larger multiplier for actual text height
       const textHeight = titleSize * 1.3;
 
-      // Fit within both width and height constraints
-      if (textWidth <= maxTitleWidth && textHeight <= maxTitleHeight) {
+      // Fit within both width and height constraints with slight margin (95%)
+      if (textWidth <= maxTitleWidth * 0.95 && textHeight <= maxTitleHeight * 0.95) {
         setTitleFontSize(titleSize);
         break;
       }
@@ -772,17 +778,22 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
     let contentSize = 100;
     while (contentSize > 10) {
       ctx.font = `${contentSize}px ${fontFamily}`;
-      const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+
+      // Measure the widest line (handle empty lines)
+      const lineWidths = lines.map(line => line.trim() ? ctx.measureText(line).width : 0);
+      const maxLineWidth = lineWidths.length > 0 ? Math.max(...lineWidths) : 0;
       const totalHeight = lines.length * contentSize * 1.2;
 
-      // Fit within both width and height constraints of the rectangle
-      if (maxLineWidth <= maxContentWidth && totalHeight <= maxContentHeight) {
+      // Use slightly smaller target (95%) to ensure proper margins within the rectangle
+      if (maxLineWidth <= maxContentWidth * 0.95 && totalHeight <= maxContentHeight * 0.95) {
         setContentFontSize(contentSize);
         return;
       }
       contentSize -= 2;
     }
-  }, [leftPanelSize, titleLines, lines, fontFamily, isSlide]);
+    // If no size fits, set minimum
+    setContentFontSize(10);
+  }, [leftPanelSize, titleLines, lines, fontFamily, isSlide, selectedLiveItem]);
 
   if (isSlide && !isTextCleared && !isTextHidden && slideTitle) {
     // Slide layout: title + content
@@ -1028,7 +1039,7 @@ function ChordsPanel({ theme, currentItems, selectedLiveItem }) {
   );
 }
 
-function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem }) {
+function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem, setSongItems }) {
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
@@ -1057,32 +1068,38 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
     const newContent = editingContent;
     if (!newTitle) return;
 
-    let updatedSongs = [];
-    setSongs(prev => {
-      updatedSongs = prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent } : s));
-      return updatedSongs;
-    });
+    console.log('[SongsPanel] Saving song:', { id, title: newTitle, lyrics: newContent?.substring(0, 50) + '...' });
+
+    // Optimistically update local state
+    setSongs(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent } : s)));
 
     try {
-      sendUpdate?.('songs', 'songs', updatedSongs);
-    } catch (err) {
-      console.error('Failed to send websocket update for songs:', err);
-    }
-
-    try {
-      await fetch(`/api/songs/${id}`, {
+      // Save to database - the server will broadcast to other clients via WebSocket
+      console.log('[SongsPanel] Calling PUT /api/songs/' + id);
+      const response = await fetch(`/api/songs/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle, lyrics: newContent })
       });
-    } catch (err) {
-      console.error('Failed to save song:', err);
-    }
-    // Re-fetch saved song from DB to ensure canonical data, and update live if this was selected
-    try {
+
+      console.log('[SongsPanel] PUT response status:', response.status);
+      const responseData = await response.json();
+      console.log('[SongsPanel] PUT response data:', responseData);
+
+      // Re-fetch saved song from DB to ensure canonical data
       const res = await fetch(`/api/songs/${id}`);
       if (res.ok) {
         const data = await res.json();
+
+        // Update the songs list with fresh data from DB
+        setSongs(prev => prev.map(s => (s.id === id ? data : s)));
+
+        // Update song playlist items if this song is in the playlist (update the title)
+        setSongItems(prev => prev.map(item =>
+          item.id === id ? { ...item, text: data.title, songData: data } : item
+        ));
+
+        // If this song is currently selected, update the live display
         const sel = selectedLiveItem;
         if (sel) {
           const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
@@ -1092,7 +1109,7 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
         }
       }
     } catch (err) {
-      console.error('Failed to re-fetch song after save:', err);
+      console.error('Failed to save song:', err);
     }
 
     setEditingId(null);
@@ -1169,7 +1186,7 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
   );
 }
 
-function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSlide, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem }) {
+function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSlide, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem, setSlideItems }) {
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
@@ -1198,32 +1215,38 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
     const newContent = editingContent;
     if (!newTitle) return;
 
-    let updatedSlides = [];
-    setSlides(prev => {
-      updatedSlides = prev.map(s => (s.id === id ? { ...s, title: newTitle, content: newContent } : s));
-      return updatedSlides;
-    });
+    console.log('[SlidesPanel] Saving slide:', { id, title: newTitle, content: newContent?.substring(0, 50) + '...' });
+
+    // Optimistically update local state
+    setSlides(prev => prev.map(s => (s.id === id ? { ...s, title: newTitle, content: newContent } : s)));
 
     try {
-      sendUpdate?.('slides', 'slides', updatedSlides);
-    } catch (err) {
-      console.error('Failed to send websocket update for slides:', err);
-    }
-
-    try {
-      await fetch(`/api/slides/${id}`, {
+      // Save to database - the server will broadcast to other clients via WebSocket
+      console.log('[SlidesPanel] Calling PUT /api/slides/' + id);
+      const response = await fetch(`/api/slides/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle, content: newContent })
       });
-    } catch (err) {
-      console.error('Failed to save slide:', err);
-    }
-    // Re-fetch saved slide from DB to ensure canonical data, and update live if this was selected
-    try {
+
+      console.log('[SlidesPanel] PUT response status:', response.status);
+      const responseData = await response.json();
+      console.log('[SlidesPanel] PUT response data:', responseData);
+
+      // Re-fetch saved slide from DB to ensure canonical data
       const res = await fetch(`/api/slides/${id}`);
       if (res.ok) {
         const data = await res.json();
+
+        // Update the slides list with fresh data from DB
+        setSlides(prev => prev.map(s => (s.id === id ? data : s)));
+
+        // Update slide playlist items if this slide is in the playlist (update the title)
+        setSlideItems(prev => prev.map(item =>
+          item.id === id ? { ...item, text: data.title, slideData: data } : item
+        ));
+
+        // If this slide is currently selected, update the live display
         const sel = selectedLiveItem;
         if (sel) {
           const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
@@ -1233,7 +1256,7 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
         }
       }
     } catch (err) {
-      console.error('Failed to re-fetch slide after save:', err);
+      console.error('Failed to save slide:', err);
     }
 
     setEditingId(null);
@@ -1310,7 +1333,7 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
@@ -1318,9 +1341,9 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} selectedLiveItem={selectedLiveItem} />;
       case 'Songs':
-        return <SongsPanel theme={theme} songs={songs} loading={loading} onAddSong={onAddSong} setSongs={setSongs} onSelectSong={onSelectSong} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} />;
+        return <SongsPanel theme={theme} songs={songs} loading={loading} onAddSong={onAddSong} setSongs={setSongs} onSelectSong={onSelectSong} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} setSongItems={setSongItems} />;
       case 'Slides':
-        return <SlidesPanel theme={theme} slides={slides} loading={loading} onAddSlide={onAddSlide} setSlides={setSlides} onSelectSlide={onSelectSlide} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} />;
+        return <SlidesPanel theme={theme} slides={slides} loading={loading} onAddSlide={onAddSlide} setSlides={setSlides} onSelectSlide={onSelectSlide} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} setSlideItems={setSlideItems} />;
       default:
         return null;
     }
@@ -1813,10 +1836,11 @@ export default function App() {
             sendUpdate={sendUpdate}
             selectedLiveItem={selectedLiveItem}
             setSelectedLiveItem={setSelectedLiveItem}
+            setSongItems={setSongItems}
+            setSlideItems={setSlideItems}
             currentItems={currentItems}
             liveBackgroundColor={liveBackgroundColor}
             liveBackgroundImage={liveBackgroundImage}
-            selectedLiveItem={selectedLiveItem}
           />
 
           <RightPanel

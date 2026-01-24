@@ -204,20 +204,29 @@ async function startServer(port) {
       const id = parseInt(req.params.id);
       const { title, lyrics } = req.body;
 
-      const stmt = db.prepare('UPDATE songs SET title = ?, lyrics = ? WHERE id = ?');
-      stmt.run(title, lyrics, id);
+      try {
+        const stmt = db.prepare('UPDATE songs SET title = ?, lyrics = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+        const result = stmt.run(title, lyrics, id);
 
-      // Reload songs into current state
-      const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
-      currentState.songs = songsStmt.all();
+        if (result.changes === 0) {
+          return res.status(404).json({ error: 'Song not found' });
+        }
 
-      // Broadcast to all clients
-      broadcastToAll({
-        type: 'songs',
-        data: currentState.songs
-      });
+        // Reload songs into current state
+        const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
+        currentState.songs = songsStmt.all();
 
-      res.json({ success: true });
+        // Broadcast to all clients
+        broadcastToAll({
+          type: 'songs',
+          data: currentState.songs
+        });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Error updating song:', err);
+        res.status(500).json({ error: 'Failed to update song' });
+      }
     });
 
     // Get individual slide by ID
@@ -237,20 +246,36 @@ async function startServer(port) {
       const id = parseInt(req.params.id);
       const { title, content } = req.body;
 
-      const stmt = db.prepare('UPDATE slides SET title = ?, content = ? WHERE id = ?');
-      stmt.run(title, content, id);
+      console.log(`[API] PUT /api/slides/${id}`, { title, content: content?.substring(0, 50) + '...' });
 
-      // Reload slides into current state
-      const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
-      currentState.slides = slidesStmt.all();
+      try {
+        const stmt = db.prepare('UPDATE slides SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+        const result = stmt.run(title, content, id);
 
-      // Broadcast to all clients
-      broadcastToAll({
-        type: 'slides',
-        data: currentState.slides
-      });
+        console.log(`[API] Update result:`, { changes: result.changes });
 
-      res.json({ success: true });
+        if (result.changes === 0) {
+          console.error(`[API] Slide ${id} not found in database`);
+          return res.status(404).json({ error: 'Slide not found' });
+        }
+
+        // Reload slides into current state
+        const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
+        currentState.slides = slidesStmt.all();
+
+        console.log(`[API] Broadcasting slide update to all clients`);
+
+        // Broadcast to all clients
+        broadcastToAll({
+          type: 'slides',
+          data: currentState.slides
+        });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('[API] Error updating slide:', err);
+        res.status(500).json({ error: 'Failed to update slide' });
+      }
     });
 
     // Get selected live item
