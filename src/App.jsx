@@ -1082,6 +1082,26 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
   const [editingContent, setEditingContent] = useState('');
   const [editingChords, setEditingChords] = useState('');
 
+  const deleteSong = async (id) => {
+    if (!window.confirm('Delete this song? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/songs/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      // Remove from local state
+      setSongs(prev => prev.filter(s => s.id !== id));
+      setSongItems(prev => prev.filter(i => i.id !== id));
+
+      // If deleted item was selected live, clear selection
+      const selId = selectedLiveItem?.id ?? selectedLiveItem?.songData?.id ?? selectedLiveItem?.slideData?.id;
+      if (selId && String(selId) === String(id)) {
+        setSelectedLiveItem(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete song:', err);
+      window.alert('Failed to delete song');
+    }
+  };
+
   useEffect(() => {
     if (editingId === null) {
       setEditingTitle('');
@@ -1278,11 +1298,14 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
                 <>
                   <span className="cursor-pointer flex-1" onClick={() => onSelectSong?.(song)}>{song.title}</span>
                   <div className="flex items-center gap-2">
+                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSong(song)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Plus size={16} />
+                    </button>
                     <button onClick={() => startEditing(song)} title="Edit" aria-label="Edit" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
                       <Edit size={16} />
                     </button>
-                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSong(song)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
-                      <Plus size={16} />
+                    <button onClick={() => deleteSong(song.id)} title="Delete" aria-label="Delete" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-500 text-white hover:bg-red-600'}`}>
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </>
@@ -1299,6 +1322,24 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingContent, setEditingContent] = useState('');
+
+  const deleteSlide = async (id) => {
+    if (!window.confirm('Delete this slide? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/slides/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      setSlides(prev => prev.filter(s => s.id !== id));
+      setSlideItems(prev => prev.filter(i => i.id !== id));
+
+      const selId = selectedLiveItem?.id ?? selectedLiveItem?.songData?.id ?? selectedLiveItem?.slideData?.id;
+      if (selId && String(selId) === String(id)) {
+        setSelectedLiveItem(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete slide:', err);
+      window.alert('Failed to delete slide');
+    }
+  };
 
   useEffect(() => {
     if (editingId === null) {
@@ -1478,11 +1519,14 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
                 <>
                   <span className="cursor-pointer flex-1" onClick={() => onSelectSlide?.(slide)}>{slide.title}</span>
                   <div className="flex items-center gap-2">
+                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSlide(slide)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Plus size={16} />
+                    </button>
                     <button onClick={() => startEditing(slide)} title="Edit" aria-label="Edit" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
                       <Edit size={16} />
                     </button>
-                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSlide(slide)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
-                      <Plus size={16} />
+                    <button onClick={() => deleteSlide(slide.id)} title="Delete" aria-label="Delete" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-500 text-white hover:bg-red-600'}`}>
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </>

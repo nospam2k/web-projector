@@ -372,6 +372,45 @@ async function startServer(port) {
       }
     });
 
+    // Delete individual song
+    expressApp.delete('/api/songs/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      try {
+        const stmt = db.prepare('DELETE FROM songs WHERE id = ?');
+        const result = stmt.run(id);
+        if (result.changes === 0) {
+          return res.status(404).json({ error: 'Song not found' });
+        }
+
+        // Remove from playlists if present
+        try {
+          const playlistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
+          const row = playlistStmt.get('songs');
+          if (row) {
+            const items = JSON.parse(row.data).filter(it => it.id !== id);
+            const up = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
+            up.run('songs', JSON.stringify(items));
+            currentState.songItems = currentState.songItems.filter(i => i.id !== id);
+          }
+        } catch (e) {
+          console.error('Error updating playlists after song delete:', e);
+        }
+
+        // Reload songs into current state
+        const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
+        currentState.songs = songsStmt.all();
+
+        // Broadcast to all clients
+        broadcastToAll({ type: 'songs', data: currentState.songs });
+        broadcastToAll({ type: 'songItems', data: currentState.songItems });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Error deleting song:', err);
+        res.status(500).json({ error: 'Failed to delete song' });
+      }
+    });
+
     // Get individual slide by ID
     expressApp.get('/api/slides/:id', (req, res) => {
       const id = parseInt(req.params.id);
@@ -418,6 +457,45 @@ async function startServer(port) {
       } catch (err) {
         console.error('[API] Error updating slide:', err);
         res.status(500).json({ error: 'Failed to update slide' });
+      }
+    });
+
+    // Delete individual slide
+    expressApp.delete('/api/slides/:id', (req, res) => {
+      const id = parseInt(req.params.id);
+      try {
+        const stmt = db.prepare('DELETE FROM slides WHERE id = ?');
+        const result = stmt.run(id);
+        if (result.changes === 0) {
+          return res.status(404).json({ error: 'Slide not found' });
+        }
+
+        // Remove from playlists if present
+        try {
+          const playlistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
+          const row = playlistStmt.get('slides');
+          if (row) {
+            const items = JSON.parse(row.data).filter(it => it.id !== id);
+            const up = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
+            up.run('slides', JSON.stringify(items));
+            currentState.slideItems = currentState.slideItems.filter(i => i.id !== id);
+          }
+        } catch (e) {
+          console.error('Error updating playlists after slide delete:', e);
+        }
+
+        // Reload slides into current state
+        const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
+        currentState.slides = slidesStmt.all();
+
+        // Broadcast to all clients
+        broadcastToAll({ type: 'slides', data: currentState.slides });
+        broadcastToAll({ type: 'slideItems', data: currentState.slideItems });
+
+        res.json({ success: true });
+      } catch (err) {
+        console.error('Error deleting slide:', err);
+        res.status(500).json({ error: 'Failed to delete slide' });
       }
     });
 
