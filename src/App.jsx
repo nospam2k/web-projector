@@ -474,7 +474,26 @@ function useDragAndDrop(items, setItems, onDragEnd) {
 // COMPONENTS
 // ============================================================================
 
-function MenuBar({ activeButton, onButtonClick, theme, menuBarRef }) {
+function MenuBar({ activeButton, onButtonClick, theme, menuBarRef, uiFontFamily, uiFontSize, uiFontStyle }) {
+  const getFontStyleProps = () => {
+    switch (uiFontStyle) {
+      case 'bold':
+        return { fontWeight: 'bold', fontStyle: 'normal' };
+      case 'italic':
+        return { fontWeight: 'normal', fontStyle: 'italic' };
+      case 'bold-italic':
+        return { fontWeight: 'bold', fontStyle: 'italic' };
+      default:
+        return { fontWeight: 'normal', fontStyle: 'normal' };
+    }
+  };
+
+  const uiStyle = {
+    fontFamily: uiFontFamily,
+    fontSize: `${uiFontSize}px`,
+    ...getFontStyleProps()
+  };
+
   return (
     <div ref={menuBarRef} className={theme.menuBar}>
       <div className="flex w-full">
@@ -485,6 +504,7 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef }) {
             className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} ${
               activeButton === item ? theme.menuButtonActive : theme.menuButton
             }`}
+            style={uiStyle}
           >
             {item}
           </button>
@@ -494,7 +514,7 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef }) {
   );
 }
 
-function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle }) {
+function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle, uiFontFamily, uiFontSize, uiFontStyle }) {
   const [isClearActive, setIsClearActive] = useState(false);
   const [isHideActive, setIsHideActive] = useState(false);
 
@@ -519,6 +539,8 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
           isClearActive ? 'bg-green-500 text-white hover:bg-green-600 focus:bg-green-500 active:bg-green-500' : theme.menuButton
         }`}
+        // apply UI font styles
+        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         {isClearActive ? 'Show' : 'Clear'}
       </button>
@@ -531,18 +553,21 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
           isHideActive ? 'bg-green-500 text-white hover:bg-green-600 focus:bg-green-500 active:bg-green-500' : theme.menuButton
         }`}
+        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         {isHideActive ? 'Show' : 'Hide'}
       </button>
       <button
         style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
+        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Previous
       </button>
       <button
         style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
+        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Next
       </button>
@@ -550,7 +575,7 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
   );
 }
 
-function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle, onItemClick, selectedLiveItem, onDeleteItem }) {
+function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHandlers, showToggle, toggleLabel, onToggle, onItemClick, selectedLiveItem, onDeleteItem, uiFontFamily, uiFontSize, uiFontStyle }) {
   const [selectedItem, setSelectedItem] = useState(null);
 
   // When the currently selected live item changes (e.g. from server),
@@ -627,7 +652,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
                   selectedItem === item.id ? theme.menuButtonActive : theme.menuButton
                 }`}
             >
-              <span className="cursor-pointer flex-1" onClick={() => handleItemClick(item)}>
+              <span className="cursor-pointer flex-1" onClick={() => handleItemClick(item)} style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}>
                 {item.text}
               </span>
               <button
@@ -648,7 +673,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = 'Arial Black', fontStyle = 'normal' }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = 'Arial Black', fontStyle = 'normal', uiFontFamily, uiFontSize, uiFontStyle }) {
   const [fontSize, setFontSize] = useState(40);
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
@@ -913,6 +938,9 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
           controlButtonsRef={controlButtonsRef}
           onClearToggle={setIsTextCleared}
           onHideToggle={setIsTextHidden}
+          uiFontFamily={uiFontFamily}
+          uiFontSize={uiFontSize}
+          uiFontStyle={uiFontStyle}
         />
       </>
     );
@@ -956,6 +984,9 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
         controlButtonsRef={controlButtonsRef}
         onClearToggle={setIsTextCleared}
         onHideToggle={setIsTextHidden}
+        uiFontFamily={uiFontFamily}
+        uiFontSize={uiFontSize}
+        uiFontStyle={uiFontStyle}
       />
     </>
   );
@@ -1324,11 +1355,11 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle, uiFontFamily, uiFontSize, uiFontStyle }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
-        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} fontFamily={fontFamily} fontStyle={fontStyle} />;
+        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} fontFamily={fontFamily} fontStyle={fontStyle} uiFontFamily={uiFontFamily} uiFontSize={uiFontSize} uiFontStyle={uiFontStyle} />;
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} selectedLiveItem={selectedLiveItem} />;
       case 'Songs':
@@ -1347,7 +1378,7 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
   );
 }
 
-function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage, fontFamily, setFontFamily, fontStyle, setFontStyle, sendSettings }) {
+function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, setLiveBackgroundColor, liveBackgroundImage, setLiveBackgroundImage, fontFamily, setFontFamily, fontStyle, setFontStyle, sendSettings, uiFontFamily, setUiFontFamily, uiFontSize, setUiFontSize, uiFontStyle, setUiFontStyle }) {
   const [bkgimages, setBkgimages] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -1467,6 +1498,57 @@ function SettingsPanel({ theme, isDarkMode, toggleTheme, liveBackgroundColor, se
               <option value="bold-italic">Bold Italic</option>
             </select>
           </div>
+          
+          <div className="border-t pt-4 mt-4">
+            <h3 className="font-semibold mb-4">UI Font Settings (menus, buttons, lists)</h3>
+
+            <div className={`p-4 rounded border ${theme.border} mb-4`}>
+              <label className="block mb-2 text-sm">UI Font Family</label>
+              <select
+                value={uiFontFamily}
+                onChange={(e) => setUiFontFamily(e.target.value)}
+                className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+              >
+                <option value="inherit">Default</option>
+                <option value="Arial">Arial</option>
+                <option value="Arial Black">Arial Black</option>
+                <option value="Helvetica">Helvetica</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Verdana">Verdana</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Impact">Impact</option>
+                <option value="Comic Sans MS">Comic Sans MS</option>
+              </select>
+            </div>
+
+            <div className={`p-4 rounded border ${theme.border} mb-4`}>
+              <label className="block mb-2 text-sm">UI Font Size (px)</label>
+              <input
+                type="number"
+                min={10}
+                max={36}
+                value={uiFontSize}
+                onChange={(e) => setUiFontSize(e.target.value)}
+                className={`w-32 p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+              />
+            </div>
+
+            <div className={`p-4 rounded border ${theme.border} mb-4`}>
+              <label className="block mb-2 text-sm">UI Font Style</label>
+              <select
+                value={uiFontStyle}
+                onChange={(e) => setUiFontStyle(e.target.value)}
+                className={`w-full p-2 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`}
+              >
+                <option value="normal">Normal</option>
+                <option value="bold">Bold</option>
+                <option value="italic">Italic</option>
+                <option value="bold-italic">Bold Italic</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="border-t pt-4 mt-4">
@@ -1557,6 +1639,28 @@ export default function App() {
   const [fontFamily, setFontFamily] = useState('Arial Black');
   const [fontStyle, setFontStyle] = useState('normal');
   const [selectedLiveItem, setSelectedLiveItem] = useState(null);
+
+  // UI font settings (stored in localStorage, not synced)
+  const [uiFontSize, setUiFontSize] = useState(() => {
+    return localStorage.getItem('uiFontSize') || '14';
+  });
+  const [uiFontFamily, setUiFontFamily] = useState(() => {
+    return localStorage.getItem('uiFontFamily') || 'inherit';
+  });
+  const [uiFontStyle, setUiFontStyle] = useState(() => {
+    return localStorage.getItem('uiFontStyle') || 'normal';
+  });
+
+  // Persist UI font settings to localStorage (these are per-browser settings)
+  useEffect(() => {
+    try {
+      localStorage.setItem('uiFontSize', String(uiFontSize));
+      localStorage.setItem('uiFontFamily', String(uiFontFamily));
+      localStorage.setItem('uiFontStyle', String(uiFontStyle));
+    } catch (e) {
+      // ignore localStorage errors
+    }
+  }, [uiFontSize, uiFontFamily, uiFontStyle]);
 
   const menuBarRef = useRef(null);
   const controlButtonsRef = useRef(null);
@@ -1839,6 +1943,9 @@ export default function App() {
         onButtonClick={handleButtonClick}
         theme={currentTheme}
         menuBarRef={menuBarRef}
+        uiFontFamily={uiFontFamily}
+        uiFontSize={uiFontSize}
+        uiFontStyle={uiFontStyle}
       />
 
       {activeButton === 'Settings' ? (
@@ -1855,6 +1962,12 @@ export default function App() {
           fontStyle={fontStyle}
           setFontStyle={setFontStyle}
           sendSettings={sendSettings}
+          uiFontFamily={uiFontFamily}
+          setUiFontFamily={setUiFontFamily}
+          uiFontSize={uiFontSize}
+          setUiFontSize={setUiFontSize}
+          uiFontStyle={uiFontStyle}
+          setUiFontStyle={setUiFontStyle}
         />
       ) : (
         <div className={`flex h-[calc(100vh-60px)] overflow-hidden ${isPortrait ? 'flex-col' : 'flex-row'}`}>
@@ -1884,6 +1997,9 @@ export default function App() {
             liveBackgroundImage={liveBackgroundImage}
             fontFamily={fontFamily}
             fontStyle={fontStyle}
+            uiFontFamily={uiFontFamily}
+            uiFontSize={uiFontSize}
+            uiFontStyle={uiFontStyle}
           />
 
           <RightPanel
@@ -1908,6 +2024,9 @@ export default function App() {
             onItemClick={setSelectedLiveItem}
             selectedLiveItem={selectedLiveItem}
             onDeleteItem={handleDeleteFromPlaylist}
+            uiFontFamily={uiFontFamily}
+            uiFontSize={uiFontSize}
+            uiFontStyle={uiFontStyle}
           />
         </div>
       )}
