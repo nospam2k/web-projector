@@ -500,12 +500,12 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef, uiFontFamily,
 
   return (
     <div ref={menuBarRef} className={theme.menuBar}>
-      <div className="flex w-full">
+      <div className="p-2 flex w-full gap-2">
         {MENU_ITEMS.map((item) => (
           <button
             key={item}
             onClick={() => onButtonClick(item)}
-            className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} ${
+            className={`flex-1 basis-0 min-w-0 px-3 py-4 font-semibold transition duration-200 border ${theme.border} ${
               activeButton === item ? theme.menuButtonActive : theme.menuButton
             }`}
             style={uiStyle}
@@ -518,7 +518,7 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef, uiFontFamily,
   );
 }
 
-function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
+function ControlButtons({ theme, controlButtonsRef, onClearToggle, onHideToggle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
   const [isClearActive, setIsClearActive] = useState(false);
   const [isHideActive, setIsHideActive] = useState(false);
 
@@ -533,7 +533,7 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
   };
 
   return (
-    <div ref={controlButtonsRef} className={`flex ${theme.leftPanel}`} style={{ width }}>
+    <div ref={controlButtonsRef} className={`p-2 flex gap-2 ${theme.leftPanel}`}>
       <button
         onPointerDown={(e) => {
           e.preventDefault();
@@ -942,7 +942,6 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
         </div>
         <ControlButtons 
           theme={theme} 
-          width={leftPanelSize.width} 
           controlButtonsRef={controlButtonsRef}
           onClearToggle={setIsTextCleared}
           onHideToggle={setIsTextHidden}
@@ -990,7 +989,6 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
       </div>
       <ControlButtons 
         theme={theme} 
-        width={leftPanelSize.width} 
         controlButtonsRef={controlButtonsRef}
         onClearToggle={setIsTextCleared}
         onHideToggle={setIsTextHidden}
