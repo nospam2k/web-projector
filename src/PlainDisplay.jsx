@@ -58,8 +58,8 @@ function PlainDisplay() {
             case 'fullState':
               setSelectedLiveItem(data.data.selectedLiveItem || null);
               if (data.data.settings) {
-                setFontFamily(data.data.settings.fontFamily || '');
-                setFontStyle(data.data.settings.fontStyle || 'normal');
+                if (typeof data.data.settings.fontFamily !== 'undefined') setFontFamily(data.data.settings.fontFamily);
+                if (typeof data.data.settings.fontStyle !== 'undefined') setFontStyle(data.data.settings.fontStyle);
               }
               break;
             case 'selectedLiveItem':
@@ -305,7 +305,7 @@ function PlainDisplay() {
                   textAlign: 'center',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black',
+                  textShadow: 'none',
                   overflow: 'visible'
                 }}
               >
@@ -350,7 +350,7 @@ function PlainDisplay() {
                   textAlign: 'left',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                  textShadow: 'none'
                 }}
               >
                 {content}
@@ -395,7 +395,7 @@ function PlainDisplay() {
             textAlign: 'center',
             color: 'white',
             WebkitTextStroke: '1px black',
-            textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+            textShadow: 'none'
           }}>
             {content}
           </pre>

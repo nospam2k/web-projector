@@ -62,8 +62,8 @@ function LiveDisplay() {
               if (data.data.settings) {
                 setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
                 setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
-                setFontFamily(data.data.settings.fontFamily || '');
-                setFontStyle(data.data.settings.fontStyle || 'normal');
+                if (typeof data.data.settings.fontFamily !== 'undefined') setFontFamily(data.data.settings.fontFamily);
+                if (typeof data.data.settings.fontStyle !== 'undefined') setFontStyle(data.data.settings.fontStyle);
               }
               break;
             case 'selectedLiveItem':
@@ -314,7 +314,7 @@ function LiveDisplay() {
                   textAlign: 'center',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black',
+                  textShadow: 'none',
                   overflow: 'visible'
                 }}
               >
@@ -359,7 +359,7 @@ function LiveDisplay() {
                   textAlign: 'left',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                  textShadow: 'none'
                 }}
               >
                 {content}
@@ -404,7 +404,7 @@ function LiveDisplay() {
             textAlign: 'center',
             color: 'white',
             WebkitTextStroke: '1px black',
-            textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+            textShadow: 'none'
           }}>
             {content}
           </pre>

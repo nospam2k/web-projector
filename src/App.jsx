@@ -180,10 +180,10 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
             setters.setSelectedLiveItem(data.data.selectedLiveItem || null);
             if (data.data.settings) {
               // Dark mode is saved in localStorage, not synced from server
-              setters.setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
-              setters.setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
-              setters.setFontFamily(data.data.settings.fontFamily || '');
-              setters.setFontStyle(data.data.settings.fontStyle || 'normal');
+              if (typeof data.data.settings.liveBackgroundColor !== 'undefined') setters.setLiveBackgroundColor(data.data.settings.liveBackgroundColor || '#000000');
+              if (typeof data.data.settings.liveBackgroundImage !== 'undefined') setters.setLiveBackgroundImage(data.data.settings.liveBackgroundImage || null);
+              if (typeof data.data.settings.fontFamily !== 'undefined') setters.setFontFamily(data.data.settings.fontFamily);
+              if (typeof data.data.settings.fontStyle !== 'undefined') setters.setFontStyle(data.data.settings.fontStyle);
             }
             break;
           case 'songs':
@@ -204,10 +204,10 @@ function useWebSocket(songs, setSongs, slides, setSlides, songItems, setSongItem
           case 'settings':
             if (data.data) {
               // Dark mode is saved in localStorage, not synced from server
-              setters.setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
-              setters.setLiveBackgroundImage(data.data.liveBackgroundImage || null);
-              setters.setFontFamily(data.data.fontFamily || '');
-              setters.setFontStyle(data.data.fontStyle || 'normal');
+              if (typeof data.data.liveBackgroundColor !== 'undefined') setters.setLiveBackgroundColor(data.data.liveBackgroundColor || '#000000');
+              if (typeof data.data.liveBackgroundImage !== 'undefined') setters.setLiveBackgroundImage(data.data.liveBackgroundImage || null);
+              if (typeof data.data.fontFamily !== 'undefined') setters.setFontFamily(data.data.fontFamily);
+              if (typeof data.data.fontStyle !== 'undefined') setters.setFontStyle(data.data.fontStyle);
             }
             break;
         }
@@ -535,12 +535,10 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
           e.preventDefault();
           handleClearToggle();
         }}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
           isClearActive ? 'bg-green-500 text-white hover:bg-green-600 focus:bg-green-500 active:bg-green-500' : theme.menuButton
         }`}
-        // apply UI font styles
-        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         {isClearActive ? 'Show' : 'Clear'}
       </button>
@@ -549,25 +547,22 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
           e.preventDefault();
           handleHideToggle();
         }}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${
           isHideActive ? 'bg-green-500 text-white hover:bg-green-600 focus:bg-green-500 active:bg-green-500' : theme.menuButton
         }`}
-        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         {isHideActive ? 'Show' : 'Hide'}
       </button>
       <button
-        style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
-        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Previous
       </button>
       <button
-        style={{ WebkitTapHighlightColor: 'transparent' }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
-        style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
+        style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Next
       </button>
@@ -878,7 +873,7 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
                   textAlign: 'center',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black',
+                  textShadow: 'none',
                   overflow: 'visible'
                 }}
               >
@@ -924,7 +919,7 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
                   textAlign: 'left',
                   color: 'white',
                   WebkitTextStroke: '1px black',
-                  textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                  textShadow: 'none'
                 }}
               >
                 {content}
@@ -971,8 +966,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
             whiteSpace: 'pre',
             textAlign: 'center',
             color: 'white',
-            WebkitTextStroke: '1px black',
-            textShadow: '1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black'
+                  WebkitTextStroke: '1px black',
+                  textShadow: 'none'
           }}>
             {content}
           </pre>
@@ -1814,7 +1809,7 @@ export default function App() {
   }, [selectedLiveItem]);
 
   // Save settings to database when they change (dark mode is saved in localStorage, not DB)
-  const settingsRef = useRef({ liveBackgroundColor, liveBackgroundImage });
+  const settingsRef = useRef({ liveBackgroundColor, liveBackgroundImage, fontFamily, fontStyle });
   const isFirstSettingsRender = useRef(true);
   useEffect(() => {
     // Skip first render to avoid saving initial values
