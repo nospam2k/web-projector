@@ -514,7 +514,7 @@ function MenuBar({ activeButton, onButtonClick, theme, menuBarRef, uiFontFamily,
   );
 }
 
-function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle, uiFontFamily, uiFontSize, uiFontStyle }) {
+function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHideToggle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
   const [isClearActive, setIsClearActive] = useState(false);
   const [isHideActive, setIsHideActive] = useState(false);
 
@@ -555,17 +555,26 @@ function ControlButtons({ theme, width, controlButtonsRef, onClearToggle, onHide
         {isHideActive ? 'Show' : 'Hide'}
       </button>
       <button
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onPrev?.();
+        }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
         style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Previous
       </button>
       <button
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onNext?.();
+        }}
         className={`flex-1 py-4 font-semibold transition duration-200 border ${theme.border} focus:outline-none focus:ring-0 ${theme.menuButton}`}
         style={{ WebkitTapHighlightColor: 'transparent', fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}
       >
         Next
       </button>
+      
     </div>
   );
 }
@@ -668,7 +677,7 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
   );
 }
 
-function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = '', fontStyle = 'normal', uiFontFamily, uiFontSize, uiFontStyle }) {
+function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, fontFamily = '', fontStyle = 'normal', uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
   const [fontSize, setFontSize] = useState(40);
   const [titleFontSize, setTitleFontSize] = useState(40);
   const [contentFontSize, setContentFontSize] = useState(30);
@@ -933,6 +942,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
           controlButtonsRef={controlButtonsRef}
           onClearToggle={setIsTextCleared}
           onHideToggle={setIsTextHidden}
+          onPrev={onPrev}
+          onNext={onNext}
           uiFontFamily={uiFontFamily}
           uiFontSize={uiFontSize}
           uiFontStyle={uiFontStyle}
@@ -979,6 +990,8 @@ function LivePanel({ theme, leftPanelSize, controlButtonsRef, currentItems, live
         controlButtonsRef={controlButtonsRef}
         onClearToggle={setIsTextCleared}
         onHideToggle={setIsTextHidden}
+        onPrev={onPrev}
+        onNext={onNext}
         uiFontFamily={uiFontFamily}
         uiFontSize={uiFontSize}
         uiFontStyle={uiFontStyle}
@@ -1350,11 +1363,11 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle, uiFontFamily, uiFontSize, uiFontStyle }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
-        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} fontFamily={fontFamily} fontStyle={fontStyle} uiFontFamily={uiFontFamily} uiFontSize={uiFontSize} uiFontStyle={uiFontStyle} />;
+        return <LivePanel theme={theme} leftPanelSize={leftPanelSize} controlButtonsRef={controlButtonsRef} currentItems={currentItems} liveBackgroundColor={liveBackgroundColor} liveBackgroundImage={liveBackgroundImage} selectedLiveItem={selectedLiveItem} fontFamily={fontFamily} fontStyle={fontStyle} uiFontFamily={uiFontFamily} uiFontSize={uiFontSize} uiFontStyle={uiFontStyle} onPrev={onPrev} onNext={onNext} />;
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} selectedLiveItem={selectedLiveItem} />;
       case 'Songs':
@@ -1921,6 +1934,31 @@ export default function App() {
     sendUpdate('updatePlaylist', playlistType, newItems);
   };
 
+  const getSelectedId = () => {
+    if (!selectedLiveItem) return null;
+    return selectedLiveItem.id ?? selectedLiveItem.songData?.id ?? selectedLiveItem.slideData?.id ?? null;
+  };
+
+  const handlePrevSelection = () => {
+    const items = rightPanelItems;
+    const selId = getSelectedId();
+    if (!selId || !items || items.length === 0) return;
+    const idx = items.findIndex(it => String(it.id) === String(selId));
+    if (idx <= 0) return; // nothing to do if first or not found
+    const prev = items[idx - 1];
+    if (prev) setSelectedLiveItem(prev);
+  };
+
+  const handleNextSelection = () => {
+    const items = rightPanelItems;
+    const selId = getSelectedId();
+    if (!selId || !items || items.length === 0) return;
+    const idx = items.findIndex(it => String(it.id) === String(selId));
+    if (idx === -1 || idx >= items.length - 1) return; // nothing to do if last or not found
+    const next = items[idx + 1];
+    if (next) setSelectedLiveItem(next);
+  };
+
   const rightPanelItems = getRightPanelItems();
   const rightPanelSetItems = getRightPanelSetItems();
   const dragHandlers = useDragAndDrop(rightPanelItems, rightPanelSetItems, handleDragEnd);
@@ -2042,6 +2080,8 @@ export default function App() {
             uiFontFamily={uiFontFamily}
             uiFontSize={uiFontSize}
             uiFontStyle={uiFontStyle}
+            onPrev={handlePrevSelection}
+            onNext={handleNextSelection}
           />
 
           <RightPanel
