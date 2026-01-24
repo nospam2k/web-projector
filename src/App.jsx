@@ -1064,13 +1064,8 @@ function ChordsPanel({ theme, currentItems, selectedLiveItem }) {
   }, [lines, fontFamily, content, selectedLiveItem]);
 
   return (
-    <div ref={containerRef} className={`${theme.leftPanel} p-8 overflow-auto h-full`}>
-      <div ref={textRef} style={{
-        fontSize: `${fontSize}px`,
-        fontFamily: fontFamily,
-        lineHeight: 1.2,
-        whiteSpace: 'pre'
-      }}>
+    <div ref={containerRef} className={`${theme.leftPanel} p-8`}>
+      <div ref={textRef} style={{ fontSize: `${fontSize}px`, fontFamily: fontFamily, lineHeight: 1.2, whiteSpace: 'pre' }}>
         {lines.map((line, index) => (
           <div key={index} style={{ fontWeight: isChordLine(line) ? 'bold' : 'normal' }}>
             {line || '\u00A0'}
@@ -1382,7 +1377,7 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
   };
 
   return (
-    <div className={`flex flex-col ${isPortrait ? 'w-full' : 'flex-1'}`}>
+    <div className={`flex flex-col min-h-0 ${isPortrait ? 'w-full' : 'flex-1'}`}>
       {renderPanel()}
     </div>
   );
@@ -2060,7 +2055,7 @@ export default function App() {
           availableFonts={availableFonts}
         />
       ) : (
-        <div className={`flex h-[calc(100vh-60px)] overflow-hidden ${isPortrait ? 'flex-col' : 'flex-row'}`}>
+        <div className={`flex ${isPortrait ? 'flex-col overflow-auto' : 'h-[calc(100vh-60px)] min-h-0 flex-row overflow-hidden'}`}>
           <LeftPanel
             activeButton={activeButton}
             theme={currentTheme}
