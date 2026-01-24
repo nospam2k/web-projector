@@ -951,7 +951,79 @@ function ChordsPanel({ theme, currentItems }) {
   );
 }
 
-function SongsPanel({ theme, songs, loading, onAddSong }) {
+function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingContent, setEditingContent] = useState('');
+
+  useEffect(() => {
+    if (editingId === null) {
+      setEditingTitle('');
+      setEditingContent('');
+    }
+  }, [editingId]);
+
+  const startEditing = (song) => {
+    setEditingId(song.id);
+    setEditingTitle(song.title || '');
+    setEditingContent(song.lyrics ?? song.content ?? song.body ?? '');
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingTitle('');
+    setEditingContent('');
+  };
+
+  const saveEditing = async (id) => {
+    const newTitle = editingTitle.trim();
+    const newContent = editingContent;
+    if (!newTitle) return;
+
+    let updatedSongs = [];
+    setSongs(prev => {
+      updatedSongs = prev.map(s => (s.id === id ? { ...s, title: newTitle, lyrics: newContent } : s));
+      return updatedSongs;
+    });
+
+    try {
+      sendUpdate?.('songs', 'songs', updatedSongs);
+    } catch (err) {
+      console.error('Failed to send websocket update for songs:', err);
+    }
+
+    try {
+      await fetch(`/api/songs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle, lyrics: newContent })
+      });
+    } catch (err) {
+      console.error('Failed to save song:', err);
+    }
+
+    try {
+      const sel = selectedLiveItem;
+      if (sel) {
+        const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
+        if (selId === id) {
+          if (sel.songData) {
+            setSelectedLiveItem({ ...sel, songData: { ...sel.songData, title: newTitle, lyrics: newContent } });
+          } else {
+            const updated = updatedSongs.find(s => s.id === id) || { id, title: newTitle, lyrics: newContent };
+            setSelectedLiveItem(updated);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update selectedLiveItem after save:', err);
+    }
+
+    setEditingId(null);
+    setEditingTitle('');
+    setEditingContent('');
+  };
+
   if (loading) {
     return (
       <div className={`${theme.leftPanel} p-8`}>
@@ -970,12 +1042,49 @@ function SongsPanel({ theme, songs, loading, onAddSong }) {
         <ul className="space-y-2">
           {songs.map(song => (
             <li key={song.id} className={`p-3 rounded flex items-center justify-between ${theme.menuButton}`}>
-              <span>{song.title}</span>
-              <Plus
-                size={20}
-                className="cursor-pointer flex-shrink-0"
-                onClick={() => onAddSong(song)}
-              />
+              {editingId === song.id ? (
+                <div className="flex-1 flex flex-col gap-3">
+                  {(() => {
+                    const inputClass = `w-full px-2 py-1 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+                    const textareaClass = `w-full h-48 p-2 rounded border resize-vertical ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+                    const saveBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`;
+                    const cancelBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`;
+                    return (
+                      <>
+                        <input
+                          autoFocus
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className={inputClass}
+                          placeholder="Song title"
+                        />
+                        <textarea
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className={textareaClass}
+                          placeholder="Song lyrics or content"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => saveEditing(song.id)} className={saveBtn}>Save</button>
+                          <button onClick={cancelEditing} className={cancelBtn}>Cancel</button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <>
+                  <span className="cursor-pointer flex-1" onClick={() => onSelectSong?.(song)}>{song.title}</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => startEditing(song)} className="px-2 py-1 bg-yellow-300 rounded text-sm">Edit</button>
+                    <Plus
+                      size={20}
+                      className="cursor-pointer flex-shrink-0"
+                      onClick={() => onAddSong(song)}
+                    />
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -984,7 +1093,79 @@ function SongsPanel({ theme, songs, loading, onAddSong }) {
   );
 }
 
-function SlidesPanel({ theme, slides, loading, onAddSlide }) {
+function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSlide, isDarkMode, sendUpdate, selectedLiveItem, setSelectedLiveItem }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingContent, setEditingContent] = useState('');
+
+  useEffect(() => {
+    if (editingId === null) {
+      setEditingTitle('');
+      setEditingContent('');
+    }
+  }, [editingId]);
+
+  const startEditing = (slide) => {
+    setEditingId(slide.id);
+    setEditingTitle(slide.title || '');
+    setEditingContent(slide.content ?? slide.body ?? '');
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingTitle('');
+    setEditingContent('');
+  };
+
+  const saveEditing = async (id) => {
+    const newTitle = editingTitle.trim();
+    const newContent = editingContent;
+    if (!newTitle) return;
+
+    let updatedSlides = [];
+    setSlides(prev => {
+      updatedSlides = prev.map(s => (s.id === id ? { ...s, title: newTitle, content: newContent } : s));
+      return updatedSlides;
+    });
+
+    try {
+      sendUpdate?.('slides', 'slides', updatedSlides);
+    } catch (err) {
+      console.error('Failed to send websocket update for slides:', err);
+    }
+
+    try {
+      await fetch(`/api/slides/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle, content: newContent })
+      });
+    } catch (err) {
+      console.error('Failed to save slide:', err);
+    }
+
+    try {
+      const sel = selectedLiveItem;
+      if (sel) {
+        const selId = sel.id ?? sel.songData?.id ?? sel.slideData?.id;
+        if (selId === id) {
+          if (sel.slideData) {
+            setSelectedLiveItem({ ...sel, slideData: { ...sel.slideData, title: newTitle, content: newContent } });
+          } else {
+            const updated = updatedSlides.find(s => s.id === id) || { id, title: newTitle, content: newContent };
+            setSelectedLiveItem(updated);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update selectedLiveItem after slide save:', err);
+    }
+
+    setEditingId(null);
+    setEditingTitle('');
+    setEditingContent('');
+  };
+
   if (loading) {
     return (
       <div className={`${theme.leftPanel} p-8`}>
@@ -1003,12 +1184,49 @@ function SlidesPanel({ theme, slides, loading, onAddSlide }) {
         <ul className="space-y-2">
           {slides.map(slide => (
             <li key={slide.id} className={`p-3 rounded flex items-center justify-between ${theme.menuButton}`}>
-              <span>{slide.title}</span>
-              <Plus
-                size={20}
-                className="cursor-pointer flex-shrink-0"
-                onClick={() => onAddSlide(slide)}
-              />
+              {editingId === slide.id ? (
+                <div className="flex-1 flex flex-col gap-3">
+                  {(() => {
+                    const inputClass = `w-full px-2 py-1 rounded border ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+                    const textareaClass = `w-full h-48 p-2 rounded border resize-vertical ${isDarkMode ? 'bg-gray-800 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300'}`;
+                    const saveBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'}`;
+                    const cancelBtn = `px-4 py-2 rounded ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`;
+                    return (
+                      <>
+                        <input
+                          autoFocus
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className={inputClass}
+                          placeholder="Slide title"
+                        />
+                        <textarea
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className={textareaClass}
+                          placeholder="Slide content"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => saveEditing(slide.id)} className={saveBtn}>Save</button>
+                          <button onClick={cancelEditing} className={cancelBtn}>Cancel</button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <>
+                  <span className="cursor-pointer flex-1" onClick={() => onSelectSlide?.(slide)}>{slide.title}</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => startEditing(slide)} className="px-2 py-1 bg-yellow-300 rounded text-sm">Edit</button>
+                    <Plus
+                      size={20}
+                      className="cursor-pointer flex-shrink-0"
+                      onClick={() => onAddSlide(slide)}
+                    />
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -1017,7 +1235,7 @@ function SlidesPanel({ theme, slides, loading, onAddSlide }) {
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, sendUpdate, setSelectedLiveItem }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
@@ -1025,9 +1243,9 @@ function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButt
       case 'Chords':
         return <ChordsPanel theme={theme} currentItems={currentItems} />;
       case 'Songs':
-        return <SongsPanel theme={theme} songs={songs} loading={loading} onAddSong={onAddSong} />;
+        return <SongsPanel theme={theme} songs={songs} loading={loading} onAddSong={onAddSong} setSongs={setSongs} onSelectSong={onSelectSong} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} />;
       case 'Slides':
-        return <SlidesPanel theme={theme} slides={slides} loading={loading} onAddSlide={onAddSlide} />;
+        return <SlidesPanel theme={theme} slides={slides} loading={loading} onAddSlide={onAddSlide} setSlides={setSlides} onSelectSlide={onSelectSlide} isDarkMode={isDarkMode} sendUpdate={sendUpdate} selectedLiveItem={selectedLiveItem} setSelectedLiveItem={setSelectedLiveItem} />;
       default:
         return null;
     }
@@ -1335,10 +1553,18 @@ export default function App() {
             leftPanelSize={leftPanelSize}
             controlButtonsRef={controlButtonsRef}
             songs={songs}
+            setSongs={setSongs}
             slides={slides}
+            setSlides={setSlides}
             loading={loading}
             onAddSong={handleAddSong}
             onAddSlide={handleAddSlide}
+            onSelectSong={setSelectedLiveItem}
+            onSelectSlide={setSelectedLiveItem}
+            isDarkMode={isDarkMode}
+            sendUpdate={sendUpdate}
+            selectedLiveItem={selectedLiveItem}
+            setSelectedLiveItem={setSelectedLiveItem}
             currentItems={currentItems}
             liveBackgroundColor={liveBackgroundColor}
             liveBackgroundImage={liveBackgroundImage}
