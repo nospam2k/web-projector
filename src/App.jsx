@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { GripVertical, Plus, Trash2 } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Edit } from 'lucide-react';
 
 // ============================================================================
 // CONSTANTS
@@ -9,18 +9,22 @@ const THEMES = {
   light: {
     bg: 'bg-gray-100',
     menuBar: 'bg-white',
-    menuButton: 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:outline-none focus:bg-gray-100 active:bg-gray-100',
+    menuButton: 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:bg-blue-700 active:bg-blue-700',
     menuButtonActive: 'bg-blue-500 text-white focus:outline-none focus:bg-blue-500 active:bg-blue-500',
     leftPanel: 'bg-white text-gray-900',
+    listItem: 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:outline-none',
+    listItemActive: 'bg-gray-300 text-gray-900',
     rightPanel: 'bg-gray-200 text-gray-900',
     border: 'border-gray-300'
   },
   dark: {
     bg: 'bg-gray-900',
     menuBar: 'bg-black',
-    menuButton: 'bg-gray-800 text-gray-300 hover:bg-gray-700 focus:outline-none focus:bg-gray-800 active:bg-gray-800',
+    menuButton: 'bg-blue-700 text-white hover:bg-blue-600 focus:outline-none focus:bg-blue-600 active:bg-blue-600',
     menuButtonActive: 'bg-blue-500 text-white focus:outline-none focus:bg-blue-500 active:bg-blue-500',
     leftPanel: 'bg-gray-800 text-gray-100',
+    listItem: 'bg-gray-700 text-gray-100 hover:bg-gray-600 focus:outline-none',
+    listItemActive: 'bg-gray-600 text-white',
     rightPanel: 'bg-gray-700 text-gray-100',
     border: 'border-gray-600'
   }
@@ -651,10 +655,10 @@ function RightPanel({ items, setItems, theme, isPortrait, rightPanelRef, dragHan
                 position: 'relative'
               }}
               className={`p-3 rounded whitespace-nowrap flex items-center justify-between gap-3 ${
-                  dragHandlers.draggedItem === index ? 'opacity-80 shadow-lg' : ''
-                } ${
-                  selectedItem === item.id ? theme.menuButtonActive : theme.menuButton
-                }`}
+                    dragHandlers.draggedItem === index ? 'opacity-80 shadow-lg' : ''
+                  } ${
+                    selectedItem === item.id ? theme.listItemActive : theme.listItem
+                  }`}
             >
               <span className="cursor-pointer flex-1" onClick={() => handleItemClick(item)} style={{ fontFamily: uiFontFamily, fontSize: `${uiFontSize}px`, ...(uiFontStyle === 'bold' ? { fontWeight: 'bold' } : {}), ...(uiFontStyle === 'italic' ? { fontStyle: 'italic' } : {}), ...(uiFontStyle === 'bold-italic' ? { fontWeight: 'bold', fontStyle: 'italic' } : {}) }}>
                 {item.text}
@@ -1169,7 +1173,7 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
       ) : (
         <ul className="space-y-2">
           {songs.map(song => (
-            <li key={song.id} className={`p-3 rounded flex items-center justify-between ${theme.menuButton}`}>
+              <li key={song.id} className={`p-3 rounded flex items-center justify-between ${theme.listItem}`}>
               {editingId === song.id ? (
                 <div className="flex-1 flex flex-col gap-3">
                   {(() => {
@@ -1204,12 +1208,12 @@ function SongsPanel({ theme, songs, loading, onAddSong, setSongs, onSelectSong, 
                 <>
                   <span className="cursor-pointer flex-1" onClick={() => onSelectSong?.(song)}>{song.title}</span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => startEditing(song)} className="px-2 py-1 bg-yellow-300 rounded text-sm">Edit</button>
-                    <Plus
-                      size={20}
-                      className="cursor-pointer flex-shrink-0"
-                      onClick={() => onAddSong(song)}
-                    />
+                    <button onClick={() => startEditing(song)} title="Edit" aria-label="Edit" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Edit size={16} />
+                    </button>
+                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSong(song)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </>
               )}
@@ -1311,7 +1315,7 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
       ) : (
         <ul className="space-y-2">
           {slides.map(slide => (
-            <li key={slide.id} className={`p-3 rounded flex items-center justify-between ${theme.menuButton}`}>
+            <li key={slide.id} className={`p-3 rounded flex items-center justify-between ${theme.listItem}`}>
               {editingId === slide.id ? (
                 <div className="flex-1 flex flex-col gap-3">
                   {(() => {
@@ -1346,12 +1350,12 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
                 <>
                   <span className="cursor-pointer flex-1" onClick={() => onSelectSlide?.(slide)}>{slide.title}</span>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => startEditing(slide)} className="px-2 py-1 bg-yellow-300 rounded text-sm">Edit</button>
-                    <Plus
-                      size={20}
-                      className="cursor-pointer flex-shrink-0"
-                      onClick={() => onAddSlide(slide)}
-                    />
+                    <button onClick={() => startEditing(slide)} title="Edit" aria-label="Edit" className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Edit size={16} />
+                    </button>
+                    <button title="Add to playlist" aria-label="Add to playlist" onClick={() => onAddSlide(slide)} className={`px-2 py-1 rounded text-sm flex items-center justify-center ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`}>
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </>
               )}
@@ -1363,7 +1367,7 @@ function SlidesPanel({ theme, slides, loading, onAddSlide, setSlides, onSelectSl
   );
 }
 
-function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, isDarkMode, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
+function LeftPanel({ activeButton, theme, isPortrait, leftPanelSize, controlButtonsRef, songs, slides, loading, onAddSong, onAddSlide, currentItems, liveBackgroundColor, liveBackgroundImage, selectedLiveItem, setSongs, setSlides, onSelectSong, onSelectSlide, sendUpdate, isDarkMode, setSelectedLiveItem, setSongItems, setSlideItems, fontFamily, fontStyle, uiFontFamily, uiFontSize, uiFontStyle, onPrev, onNext }) {
   const renderPanel = () => {
     switch (activeButton) {
       case 'Live':
