@@ -4,3 +4,7 @@ dist
 .env
 .env.local
 images
+
+# Local database and fonts
+web-projector.db
+fonts/
