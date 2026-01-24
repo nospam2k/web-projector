@@ -93,13 +93,59 @@ function loadInitialState() {
   const songRow = songPlaylistStmt.get('songs');
   const slideRow = slidePlaylistStmt.get('slides');
 
-  currentState.songItems = songRow ? JSON.parse(songRow.data) : [];
-  currentState.slideItems = slideRow ? JSON.parse(slideRow.data) : [];
+  // Hydrate playlist items with current data from database
+  const savedSongItems = songRow ? JSON.parse(songRow.data) : [];
+  currentState.songItems = savedSongItems.map(item => {
+    const song = currentState.songs.find(s => s.id === item.id);
+    if (song) {
+      return { id: song.id, text: song.title, songData: song };
+    }
+    // If song no longer exists, keep the placeholder
+    return item;
+  });
+
+  const savedSlideItems = slideRow ? JSON.parse(slideRow.data) : [];
+  currentState.slideItems = savedSlideItems.map(item => {
+    const slide = currentState.slides.find(s => s.id === item.id);
+    if (slide) {
+      return { id: slide.id, text: slide.title, slideData: slide };
+    }
+    // If slide no longer exists, keep the placeholder
+    return item;
+  });
 
   // Load selected live item
   try {
     const selectedRow = settingsStmt.get('selectedLiveItem');
-    currentState.selectedLiveItem = selectedRow ? JSON.parse(selectedRow.value) : null;
+    if (selectedRow) {
+      const savedItem = JSON.parse(selectedRow.value);
+      // savedItem should be { id, type } - reconstruct full object from database
+      if (savedItem && savedItem.id && savedItem.type) {
+        if (savedItem.type === 'song') {
+          const songStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
+          const songData = songStmt.get(savedItem.id);
+          if (songData) {
+            currentState.selectedLiveItem = { songData, id: songData.id };
+          } else {
+            currentState.selectedLiveItem = null;
+          }
+        } else if (savedItem.type === 'slide') {
+          const slideStmt = db.prepare('SELECT * FROM slides WHERE id = ?');
+          const slideData = slideStmt.get(savedItem.id);
+          if (slideData) {
+            currentState.selectedLiveItem = { slideData, id: slideData.id };
+          } else {
+            currentState.selectedLiveItem = null;
+          }
+        } else {
+          currentState.selectedLiveItem = null;
+        }
+      } else {
+        currentState.selectedLiveItem = null;
+      }
+    } else {
+      currentState.selectedLiveItem = null;
+    }
   } catch (err) {
     console.error('Error loading selected live item:', err);
     currentState.selectedLiveItem = null;
@@ -284,7 +330,31 @@ async function startServer(port) {
         const stmt = db.prepare('SELECT value FROM settings WHERE key = ?');
         const row = stmt.get('selectedLiveItem');
         if (row) {
-          res.json(JSON.parse(row.value));
+          const savedItem = JSON.parse(row.value);
+          // Reconstruct full object from database
+          if (savedItem && savedItem.id && savedItem.type) {
+            if (savedItem.type === 'song') {
+              const songStmt = db.prepare('SELECT * FROM songs WHERE id = ?');
+              const songData = songStmt.get(savedItem.id);
+              if (songData) {
+                res.json({ songData, id: songData.id });
+              } else {
+                res.json(null);
+              }
+            } else if (savedItem.type === 'slide') {
+              const slideStmt = db.prepare('SELECT * FROM slides WHERE id = ?');
+              const slideData = slideStmt.get(savedItem.id);
+              if (slideData) {
+                res.json({ slideData, id: slideData.id });
+              } else {
+                res.json(null);
+              }
+            } else {
+              res.json(null);
+            }
+          } else {
+            res.json(null);
+          }
         } else {
           res.json(null);
         }
@@ -298,10 +368,19 @@ async function startServer(port) {
     expressApp.post('/api/selected-live-item', (req, res) => {
       try {
         const selectedItem = req.body;
-        const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-        stmt.run('selectedLiveItem', JSON.stringify(selectedItem));
 
-        // Broadcast to all clients
+        // Extract only ID and type to save (not full content)
+        let itemToSave = null;
+        if (selectedItem) {
+          const id = selectedItem.id;
+          const type = selectedItem.songData ? 'song' : 'slide';
+          itemToSave = { id, type };
+        }
+
+        const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        stmt.run('selectedLiveItem', JSON.stringify(itemToSave));
+
+        // Broadcast to all clients (with full object)
         broadcastToAll({
           type: 'selectedLiveItem',
           data: selectedItem
@@ -537,10 +616,16 @@ function handleClientMessage(data, ws) {
   switch (data.type) {
     case 'updatePlaylist':
       // Update playlist in database
-      const stmt = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
-      stmt.run(data.playlistType, JSON.stringify(data.items));
+      // Strip out full content, save only id and text
+      const minimalItems = data.items.map(item => ({
+        id: item.id,
+        text: item.text
+      }));
 
-      // Update state
+      const stmt = db.prepare('INSERT OR REPLACE INTO playlists (type, data) VALUES (?, ?)');
+      stmt.run(data.playlistType, JSON.stringify(minimalItems));
+
+      // Update state with full objects (for broadcasting)
       if (data.playlistType === 'songs') {
         currentState.songItems = data.items;
       } else {
@@ -557,10 +642,18 @@ function handleClientMessage(data, ws) {
     case 'updateSelectedLiveItem':
       // Update selected live item in database
       try {
-        const settingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-        settingsStmt.run('selectedLiveItem', JSON.stringify(data.selectedItem));
+        // Extract only ID and type to save (not full content)
+        let itemToSave = null;
+        if (data.selectedItem) {
+          const id = data.selectedItem.id;
+          const type = data.selectedItem.songData ? 'song' : 'slide';
+          itemToSave = { id, type };
+        }
 
-        // Update state
+        const settingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+        settingsStmt.run('selectedLiveItem', JSON.stringify(itemToSave));
+
+        // Update state with full object (for broadcasting)
         currentState.selectedLiveItem = data.selectedItem;
 
         // Broadcast to all other clients (excluding sender)
