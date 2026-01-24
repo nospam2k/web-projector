@@ -11,12 +11,36 @@ const http = require('http');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const httpProxy = require('http-proxy');
 
-// Initialize database - point to your existing database file
-const dbPath = path.join(__dirname, '../web-projector.db');
+// Portable mode: determine data folder location
+// In development: use project root
+// In production: use 'data' folder next to the app executable
+const getDataPath = () => {
+  if (app.isPackaged) {
+    // Production: create data folder next to the app bundle
+    const exePath = app.getPath('exe');
+    // On macOS: /path/to/App.app/Contents/MacOS/App -> /path/to/
+    // On Windows/Linux: /path/to/App -> /path/to/
+    const appDir = process.platform === 'darwin'
+      ? path.dirname(path.dirname(path.dirname(exePath))) // Go up from .app/Contents/MacOS/
+      : path.dirname(exePath);
+    return path.join(appDir, 'data');
+  } else {
+    // Development: use project root
+    return path.join(__dirname, '..');
+  }
+};
+
+const dataFolder = getDataPath();
+if (!fs.existsSync(dataFolder)) {
+  fs.mkdirSync(dataFolder, { recursive: true });
+}
+
+// Initialize database in data folder
+const dbPath = path.join(dataFolder, 'web-projector.db');
 const db = new Database(dbPath);
 
-// Setup images folder - relative to app directory
-const imagesFolder = path.join(__dirname, '../images');
+// Setup images folder in data folder
+const imagesFolder = path.join(dataFolder, 'images');
 if (!fs.existsSync(imagesFolder)) {
   fs.mkdirSync(imagesFolder, { recursive: true });
 }
