@@ -36,7 +36,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: web-projector-windows
-        path: dist_electron/*.exe
+        path: |
+          dist_electron/*.exe
+          dist_electron/*.zip
         retention-days: 30
 
     # Create GitHub Release when a tag is pushed
@@ -44,7 +46,9 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: dist_electron/*.exe
+        files: |
+          dist_electron/*.exe
+          dist_electron/*.zip
         draft: false
         prerelease: false
         generate_release_notes: true
