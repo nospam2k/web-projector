@@ -3,9 +3,45 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const fs = require('fs');
 
-// Redirect console output to log file in production
+const express = require('express');
+const multer = require('multer');
+const ws = require('ws');
+const WebSocketServer = ws.WebSocketServer;
+const http = require('http');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const httpProxy = require('http-proxy');
+
+// Portable mode: determine data folder location
+// In development: use project root
+// In production: use 'data' folder next to the app executable
+const getDataPath = () => {
+  if (app.isPackaged) {
+    // Production: create data folder next to the actual executable location
+    // Use process.execPath for the real exe location (not temp extraction path)
+    const exePath = process.execPath;
+
+    // On macOS: /path/to/App.app/Contents/MacOS/App -> /path/to/
+    // On Windows/Linux: /path/to/App.exe -> /path/to/
+    const appDir = process.platform === 'darwin'
+      ? path.dirname(path.dirname(path.dirname(exePath))) // Go up from .app/Contents/MacOS/
+      : path.dirname(exePath);
+    return path.join(appDir, 'data');
+  } else {
+    // Development: use project root
+    return path.join(__dirname, '..');
+  }
+};
+
+const dataFolder = getDataPath();
+
+// Setup logging to data folder in production
 if (app.isPackaged) {
-  const logPath = path.join(app.getPath('userData'), 'app.log');
+  // Ensure data folder exists before logging
+  if (!fs.existsSync(dataFolder)) {
+    fs.mkdirSync(dataFolder, { recursive: true });
+  }
+
+  const logPath = path.join(dataFolder, 'app.log');
   const logStream = fs.createWriteStream(logPath, { flags: 'a' });
   const originalLog = console.log;
   const originalError = console.error;
@@ -24,40 +60,15 @@ if (app.isPackaged) {
 
   console.log('='.repeat(80));
   console.log('App started:', new Date().toISOString());
+  console.log('Executable path:', process.execPath);
+  console.log('Data folder:', dataFolder);
   console.log('Log file:', logPath);
-  console.log('User data path:', app.getPath('userData'));
   console.log('='.repeat(80));
 }
 
-const express = require('express');
-const multer = require('multer');
-const ws = require('ws');
-const WebSocketServer = ws.WebSocketServer;
-const http = require('http');
-const { createProxyMiddleware } = require('http-proxy-middleware');
-const httpProxy = require('http-proxy');
-
-// Portable mode: determine data folder location
-// In development: use project root
-// In production: use 'data' folder next to the app executable
-const getDataPath = () => {
-  if (app.isPackaged) {
-    // Production: create data folder next to the app bundle
-    const exePath = app.getPath('exe');
-    // On macOS: /path/to/App.app/Contents/MacOS/App -> /path/to/
-    // On Windows/Linux: /path/to/App -> /path/to/
-    const appDir = process.platform === 'darwin'
-      ? path.dirname(path.dirname(path.dirname(exePath))) // Go up from .app/Contents/MacOS/
-      : path.dirname(exePath);
-    return path.join(appDir, 'data');
-  } else {
-    // Development: use project root
-    return path.join(__dirname, '..');
-  }
-};
-
-const dataFolder = getDataPath();
 console.log('[INIT] Data folder:', dataFolder);
+
+// Ensure data folder exists (in dev mode it might not exist yet)
 if (!fs.existsSync(dataFolder)) {
   fs.mkdirSync(dataFolder, { recursive: true });
   console.log('[INIT] Created data folder');

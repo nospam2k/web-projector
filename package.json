@@ -45,7 +45,19 @@
       "target": ["dmg", "zip"]
     },
     "win": {
-      "target": ["portable"]
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "portable": {
+      "useZip": false
     },
     "linux": {
       "target": ["AppImage"]
