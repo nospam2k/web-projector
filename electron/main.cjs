@@ -819,34 +819,38 @@ async function startServer(port) {
       console.log('[SERVER] Production mode: serving static files from dist/');
       console.log('[SERVER] Client path:', clientPath);
 
+      // Read index.html once at startup
+      const indexPath = path.join(clientPath, 'index.html');
+      let indexHtml;
+
       try {
-        expressApp.use(express.static(clientPath, {
-          setHeaders: (res, filePath) => {
-            res.setHeader('Cache-Control', 'no-store, must-revalidate');
-          }
-        }));
-
-        // Fallback to serve index.html for client-side routing (must be after API routes)
-        expressApp.get('*', (req, res) => {
-          try {
-            res.setHeader('Cache-Control', 'no-store, must-revalidate');
-            const indexPath = path.join(clientPath, 'index.html');
-            console.log('[SERVER] Serving index.html from:', indexPath);
-
-            // Read file and send contents instead of using sendFile (works better with asar)
-            const indexHtml = fs.readFileSync(indexPath, 'utf8');
-            res.type('html').send(indexHtml);
-          } catch (err) {
-            console.error('[SERVER] Error serving index.html:', err);
-            res.status(500).send('<html><body><h1>Error loading app</h1><p>Please restart the application.</p></body></html>');
-          }
-        });
-
-        console.log('[SERVER] Static file serving configured successfully');
+        indexHtml = fs.readFileSync(indexPath, 'utf8');
+        console.log('[SERVER] Loaded index.html successfully');
       } catch (err) {
-        console.error('[SERVER] Error configuring static file serving:', err);
-        throw err;
+        console.error('[SERVER] Failed to load index.html:', err);
+        throw new Error('Failed to load index.html from dist folder');
       }
+
+      // Serve static assets
+      expressApp.use(express.static(clientPath, {
+        setHeaders: (res, filePath) => {
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+        }
+      }));
+
+      // Fallback for SPA routing - serve index.html for all non-API routes
+      expressApp.use((req, res, next) => {
+        // Don't intercept API routes
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+
+        // For all other routes, serve index.html
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+        res.type('html').send(indexHtml);
+      });
+
+      console.log('[SERVER] Static file serving configured successfully');
     }
 
     // Create HTTP server
