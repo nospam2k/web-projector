@@ -8,3 +8,12 @@ images
 # Local database and fonts
 web-projector.db
 fonts/
+
+# Build artifacts
+dist_electron
+*.exe
+
+# Test files
+test-*.db
+test-*.cjs
+test-*.js

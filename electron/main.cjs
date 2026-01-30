@@ -3,6 +3,32 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const fs = require('fs');
 
+// Redirect console output to log file in production
+if (app.isPackaged) {
+  const logPath = path.join(app.getPath('userData'), 'app.log');
+  const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+  const originalLog = console.log;
+  const originalError = console.error;
+
+  console.log = (...args) => {
+    const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
+    logStream.write(`[LOG] ${new Date().toISOString()} ${message}\n`);
+    originalLog(...args);
+  };
+
+  console.error = (...args) => {
+    const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
+    logStream.write(`[ERROR] ${new Date().toISOString()} ${message}\n`);
+    originalError(...args);
+  };
+
+  console.log('='.repeat(80));
+  console.log('App started:', new Date().toISOString());
+  console.log('Log file:', logPath);
+  console.log('User data path:', app.getPath('userData'));
+  console.log('='.repeat(80));
+}
+
 const express = require('express');
 const multer = require('multer');
 const ws = require('ws');
@@ -31,13 +57,33 @@ const getDataPath = () => {
 };
 
 const dataFolder = getDataPath();
+console.log('[INIT] Data folder:', dataFolder);
 if (!fs.existsSync(dataFolder)) {
   fs.mkdirSync(dataFolder, { recursive: true });
+  console.log('[INIT] Created data folder');
 }
 
 // Initialize database in data folder
 const dbPath = path.join(dataFolder, 'web-projector.db');
-const db = new Database(dbPath);
+console.log('[INIT] Database path:', dbPath);
+
+let db;
+try {
+  db = new Database(dbPath);
+  console.log('[INIT] Database opened successfully');
+} catch (err) {
+  console.error('[INIT] Failed to open database:', err);
+  // Log more details about the error
+  console.error('[INIT] Error details:', {
+    message: err.message,
+    stack: err.stack,
+    dbPath: dbPath,
+    nodeVersion: process.version,
+    platform: process.platform,
+    arch: process.arch
+  });
+  throw new Error(`Failed to open database at ${dbPath}: ${err.message}`);
+}
 
 // Setup images folder in data folder
 const imagesFolder = path.join(dataFolder, 'images');
@@ -71,21 +117,54 @@ const upload = multer({
   }
 });
 
-// Ensure playlists table exists
-db.exec(`
-  CREATE TABLE IF NOT EXISTS playlists (
-    type TEXT PRIMARY KEY,
-    data TEXT NOT NULL
-  );
-`);
+// Ensure all database tables exist
+try {
+  console.log('[INIT] Creating database tables...');
 
-// Ensure settings table exists for storing app state
-db.exec(`
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  );
-`);
+  // Ensure songs table exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS songs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      lyrics TEXT,
+      chords TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Ensure slides table exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS slides (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Ensure playlists table exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS playlists (
+      type TEXT PRIMARY KEY,
+      data TEXT NOT NULL
+    );
+  `);
+
+  // Ensure settings table exists for storing app state
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  console.log('[INIT] Database tables created successfully');
+} catch (err) {
+  console.error('[INIT] Failed to create database tables:', err);
+  throw new Error(`Failed to create database tables: ${err.message}`);
+}
 
 // ============================================================================
 // WEBSOCKET SERVER
@@ -111,42 +190,86 @@ let currentState = {
 
 // Load initial state
 function loadInitialState() {
-  const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
-  const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
-  const songPlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
-  const slidePlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
-  const settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+  console.log('[STATE] Loading initial state from database...');
 
-  currentState.songs = songsStmt.all();
-  currentState.slides = slidesStmt.all();
+  // Declare settingsStmt outside try block so it's accessible throughout function
+  let settingsStmt;
 
-  const songRow = songPlaylistStmt.get('songs');
-  const slideRow = slidePlaylistStmt.get('slides');
+  try {
+    console.log('[STATE] Preparing SELECT songs statement...');
+    const songsStmt = db.prepare('SELECT * FROM songs ORDER BY title');
 
-  // Hydrate playlist items with current data from database
-  const savedSongItems = songRow ? JSON.parse(songRow.data) : [];
-  currentState.songItems = savedSongItems.map(item => {
-    const song = currentState.songs.find(s => s.id === item.id);
-    if (song) {
-      return { id: song.id, text: song.title, songData: song };
+    console.log('[STATE] Preparing SELECT slides statement...');
+    const slidesStmt = db.prepare('SELECT * FROM slides ORDER BY title');
+
+    console.log('[STATE] Preparing SELECT playlists statements...');
+    const songPlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
+    const slidePlaylistStmt = db.prepare('SELECT data FROM playlists WHERE type = ?');
+
+    console.log('[STATE] Preparing SELECT settings statement...');
+    settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+
+    console.log('[STATE] Executing songs query...');
+    currentState.songs = songsStmt.all();
+
+    console.log('[STATE] Executing slides query...');
+    currentState.slides = slidesStmt.all();
+
+    console.log(`[STATE] Loaded ${currentState.songs.length} songs, ${currentState.slides.length} slides`);
+
+    console.log('[STATE] Loading song playlist...');
+    const songRow = songPlaylistStmt.get('songs');
+
+    console.log('[STATE] Loading slide playlist...');
+    const slideRow = slidePlaylistStmt.get('slides');
+
+    // Hydrate playlist items with current data from database
+    const savedSongItems = songRow ? JSON.parse(songRow.data) : [];
+    currentState.songItems = savedSongItems.map(item => {
+      const song = currentState.songs.find(s => s.id === item.id);
+      if (song) {
+        return { id: song.id, text: song.title, songData: song };
+      }
+      // If song no longer exists, keep the placeholder
+      return item;
+    });
+
+    const savedSlideItems = slideRow ? JSON.parse(slideRow.data) : [];
+    currentState.slideItems = savedSlideItems.map(item => {
+      const slide = currentState.slides.find(s => s.id === item.id);
+      if (slide) {
+        return { id: slide.id, text: slide.title, slideData: slide };
+      }
+      // If slide no longer exists, keep the placeholder
+      return item;
+    });
+
+    console.log(`[STATE] Loaded ${currentState.songItems.length} song items, ${currentState.slideItems.length} slide items`);
+  } catch (err) {
+    console.error('[STATE] Failed to load initial state:', err);
+    // Initialize with empty state on error
+    currentState.songs = [];
+    currentState.slides = [];
+    currentState.songItems = [];
+    currentState.slideItems = [];
+    // Re-prepare settingsStmt if it failed
+    try {
+      settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+    } catch (e) {
+      console.error('[STATE] Failed to prepare settingsStmt:', e);
     }
-    // If song no longer exists, keep the placeholder
-    return item;
-  });
-
-  const savedSlideItems = slideRow ? JSON.parse(slideRow.data) : [];
-  currentState.slideItems = savedSlideItems.map(item => {
-    const slide = currentState.slides.find(s => s.id === item.id);
-    if (slide) {
-      return { id: slide.id, text: slide.title, slideData: slide };
-    }
-    // If slide no longer exists, keep the placeholder
-    return item;
-  });
+  }
 
   // Load selected live item
   try {
+    console.log('[STATE] Loading selected live item...');
+    if (!settingsStmt) {
+      console.log('[STATE] Preparing settingsStmt for selectedLiveItem...');
+      settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+    }
+    console.log('[STATE] Querying selectedLiveItem from settings...');
     const selectedRow = settingsStmt.get('selectedLiveItem');
+    console.log('[STATE] selectedRow:', selectedRow ? 'found' : 'null');
     if (selectedRow) {
       const savedItem = JSON.parse(selectedRow.value);
       // savedItem should be { id, type } - reconstruct full object from database
@@ -183,7 +306,14 @@ function loadInitialState() {
 
   // Load app settings (background color/image - dark mode is per-device in localStorage)
   try {
+    console.log('[STATE] Loading app settings...');
+    if (!settingsStmt) {
+      console.log('[STATE] Preparing settingsStmt for appSettings...');
+      settingsStmt = db.prepare('SELECT value FROM settings WHERE key = ?');
+    }
+    console.log('[STATE] Querying appSettings from settings...');
     const settingsRow = settingsStmt.get('appSettings');
+    console.log('[STATE] appSettings row:', settingsRow ? 'found' : 'null');
     if (settingsRow) {
       const savedSettings = JSON.parse(settingsRow.value);
       currentState.settings = {
@@ -196,6 +326,8 @@ function loadInitialState() {
   } catch (err) {
     console.error('Error loading app settings:', err);
   }
+
+  console.log('[STATE] ✅ Initial state loaded successfully');
 }
 
 async function startServer(port) {
@@ -904,6 +1036,8 @@ function broadcastToAllExcept(excludeWs, message) {
 // ============================================================================
 
 function createWindow() {
+  console.log('[WINDOW] Creating main window...');
+
   // Attempt to restore saved window bounds from settings
   let savedBounds = null;
   try {
@@ -911,9 +1045,10 @@ function createWindow() {
     const row = stmt.get('windowBounds');
     if (row && row.value) {
       savedBounds = JSON.parse(row.value);
+      console.log('[WINDOW] Restored saved bounds:', savedBounds);
     }
   } catch (err) {
-    console.error('Error reading saved window bounds:', err);
+    console.error('[WINDOW] Error reading saved window bounds:', err);
     savedBounds = null;
   }
 
@@ -948,13 +1083,19 @@ function createWindow() {
 
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+  console.log('[WINDOW] isDev:', isDev, 'isPackaged:', app.isPackaged);
+
   // In development, load from Vite dev server (5173), in production load from Express (5555)
   if (isDev) {
+    console.log('[WINDOW] Loading from Vite dev server: http://localhost:5173');
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
+    console.log('[WINDOW] Loading from Express server: http://localhost:5555');
     mainWindow.loadURL('http://localhost:5555');
   }
+
+  console.log('[WINDOW] Main window created successfully');
 
   // Persist window bounds on move/resize (debounced) and on close
   let saveTimeout = null;
@@ -984,8 +1125,16 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  await startServer(5555);
-  createWindow();
+  try {
+    await startServer(5555);
+    createWindow();
+  } catch (err) {
+    console.error('Failed to start app:', err);
+    // Show error dialog to user
+    const { dialog } = require('electron');
+    dialog.showErrorBox('Startup Error', `Failed to start Web Projector:\n\n${err.message}\n\nCheck console for details.`);
+    app.quit();
+  }
 });
 
 app.on('window-all-closed', () => {
